@@ -3,3 +3,9 @@
 config/secrets.js
 node_modules/
 .DS_Store
+
+
+#python
+/.venv
+*/.venv
+*/uv.lock
