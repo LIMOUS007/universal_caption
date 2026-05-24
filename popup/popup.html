@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Universal Captions</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      width: 220px;
+      padding: 16px;
+      margin: 0;
+      text-align: center;
+    }
+    h1 {
+      font-size: 14px;
+      margin: 0 0 12px;
+      color: #333;
+    }
+    #toggle-btn {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1a73e8;
+      color: #fff;
+      transition: background 0.15s;
+    }
+    #toggle-btn.active {
+      background: #d93025;
+    }
+    #toggle-btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <h1>Universal Captions</h1>
+  <button id="toggle-btn">Start Captions</button>
+  <script src="popup.js"></script>
+</body>
+</html>
