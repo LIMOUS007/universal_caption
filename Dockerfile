@@ -2,16 +2,14 @@ FROM python:3.13-slim
 
 RUN pip install --no-cache-dir uv
 
-WORKDIR /universal_caption
+WORKDIR /app
 
-COPY pyproject.toml ./
-COPY uv.lock ./
+# Install dependencies first (layer-cached until pyproject.toml changes)
+COPY backend/pyproject.toml ./
+RUN uv pip install --system --no-cache .
 
-ENV UV_PROJECT_ENVIRONMENT=/usr/local
-
-RUN uv sync 
-
-COPY . .
+# Copy application source
+COPY backend/ .
 
 EXPOSE 8000
 

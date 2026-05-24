@@ -1,10 +1,14 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Universal Captions API — provider-agnostic live transcription server"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.136.3",
-    "uvicorn>=0.48.0",
+    "uvicorn[standard]>=0.48.0",
+    "asyncpg>=0.30.0",
+    "redis[asyncio]>=5.2.0",
+    "openai>=1.57.0",
+    "pydantic-settings>=2.7.0",
 ]
