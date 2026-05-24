@@ -1,3 +1,22 @@
+/*
+
+CONNECT DIRECTLY TO THE FASTAPI BACKEND
+
+const ws = new WebSocket("ws://localhost:8000/ws/extension-client");
+
+ws.onmessage = (event) => {
+    document.getElementById('messages').innerText += event.data + '\n';
+};
+
+document.getElementById('sendBtn').addEventListener('click', () => {
+    const input = document.getElementById('inputBox').value;
+    ws.send(input);
+});
+
+*/
+
+
+
 console.log('[UC] popup: loaded');
 
 const btn = document.getElementById('toggle-btn');
