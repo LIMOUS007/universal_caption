@@ -1,11 +1,18 @@
 console.log('[UC] popup: loaded');
 
-const btn         = document.getElementById('toggle-btn');
-const providerEl  = document.getElementById('provider');
-const apiKeyEl    = document.getElementById('api-key');
-const backendEl   = document.getElementById('backend-url');
-const statusDot   = document.getElementById('status-dot');
-const statusText  = document.getElementById('status-text');
+const btn              = document.getElementById('toggle-btn');
+const providerEl       = document.getElementById('provider');
+const apiKeyEl         = document.getElementById('api-key');
+const backendEl        = document.getElementById('backend-url');
+const statusDot        = document.getElementById('status-dot');
+const statusText       = document.getElementById('status-text');
+const fontSizeEl       = document.getElementById('font-size');
+const fontSizeValEl    = document.getElementById('font-size-val');
+const ovPositionEl     = document.getElementById('ov-position');
+const bgOpacityEl      = document.getElementById('bg-opacity');
+const bgOpacityValEl   = document.getElementById('bg-opacity-val');
+const textOpacityEl    = document.getElementById('text-opacity');
+const textOpacityValEl = document.getElementById('text-opacity-val');
 
 let isCapturing = false;
 
@@ -13,7 +20,7 @@ let isCapturing = false;
 // Restore persisted config + state
 // ---------------------------------------------------------------------------
 chrome.storage.local.get(
-  ['capturing', 'wsStatus', 'provider', 'apiKey', 'backendUrl'],
+  ['capturing', 'wsStatus', 'provider', 'apiKey', 'backendUrl', 'overlayConfig'],
   (data) => {
     console.log('[UC] popup: restored storage', data);
     isCapturing          = !!data.capturing;
@@ -22,6 +29,18 @@ chrome.storage.local.get(
     backendEl.value      = data.backendUrl  || 'ws://localhost:8000';
     updateStatus(data.wsStatus || 'disconnected');
     syncButton();
+
+    const oc = data.overlayConfig || {};
+    const fs  = oc.fontSize   ?? 18;
+    const bgo = Math.round((oc.bgOpacity   ?? 0.72) * 100);
+    const txo = Math.round((oc.textOpacity ?? 1.0)  * 100);
+    fontSizeEl.value          = fs;
+    fontSizeValEl.textContent = fs;
+    ovPositionEl.value        = oc.position ?? 'bottom';
+    bgOpacityEl.value         = bgo;
+    bgOpacityValEl.textContent = bgo;
+    textOpacityEl.value          = txo;
+    textOpacityValEl.textContent = txo;
   },
 );
 
@@ -45,6 +64,34 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.wsStatus) {
     updateStatus(changes.wsStatus.newValue);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Overlay config persistence
+// ---------------------------------------------------------------------------
+function saveOverlayConfig() {
+  chrome.storage.local.set({
+    overlayConfig: {
+      fontSize:    Number(fontSizeEl.value),
+      position:    ovPositionEl.value,
+      bgOpacity:   Number(bgOpacityEl.value)   / 100,
+      textOpacity: Number(textOpacityEl.value) / 100,
+    },
+  });
+}
+
+fontSizeEl.addEventListener('input', () => {
+  fontSizeValEl.textContent = fontSizeEl.value;
+  saveOverlayConfig();
+});
+ovPositionEl.addEventListener('change', saveOverlayConfig);
+bgOpacityEl.addEventListener('input', () => {
+  bgOpacityValEl.textContent = bgOpacityEl.value;
+  saveOverlayConfig();
+});
+textOpacityEl.addEventListener('input', () => {
+  textOpacityValEl.textContent = textOpacityEl.value;
+  saveOverlayConfig();
 });
 
 // ---------------------------------------------------------------------------
