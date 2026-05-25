@@ -21,13 +21,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case 'show-caption':
       showCaption(message.text);
       sendResponse({ status: 'ok' });
-      break;
+      return;
     case 'hide-overlay':
       removeOverlay();
       sendResponse({ status: 'ok' });
-      break;
+      return;
   }
-  return true;
+  // Unknown message — do NOT return true; don't hold the channel open
 });
 
 // ---------------------------------------------------------------------------

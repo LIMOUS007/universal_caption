@@ -58,6 +58,9 @@ async function handleStart(tabId, config) {
     config,
   });
   console.log('[UC] service-worker: init-stream response', response);
+  if (!response?.ok) {
+    throw new Error(response?.error ?? 'offscreen init failed');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -103,14 +106,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       return true;
 
-    case 'transcript':
-      // Forward final transcript chunks to the captured tab's content script
-      if (_activeTabId && message.isFinal !== false) {
-        chrome.tabs.sendMessage(_activeTabId, {
-          action: 'show-caption',
-          text:   message.text,
-        }).catch(() => {});
-      }
+    case 'transcribe-chunk':
+      handleTranscribeChunk(message.audioArray, message.mimeType);
       break;
 
     case 'connection-status':
@@ -119,6 +116,67 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Groq Whisper transcription
+// ---------------------------------------------------------------------------
+async function callGroqWhisper(audioArray, mimeType) {
+  const { groqApiKey } = await chrome.storage.local.get('groqApiKey');
+  if (!groqApiKey) throw new Error('No Groq API key set');
+
+  console.log('[UC] service-worker: audioArray length sent to Groq:', audioArray.length);
+
+  const uint8Array = new Uint8Array(audioArray);
+  const blob = new Blob([uint8Array], { type: mimeType || 'audio/webm;codecs=opus' });
+  const file = new File([blob], 'audio.webm', { type: 'audio/webm' });
+  const body = new FormData();
+  body.append('file', file);
+  body.append('model', 'whisper-large-v3-turbo');
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${groqApiKey}` },
+    body,
+  });
+
+  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+
+  const json = await res.json();
+  return (json.text ?? '').trim();
+}
+
+async function handleTranscribeChunk(audioArray, mimeType) {
+  let text;
+  try {
+    text = await callGroqWhisper(audioArray, mimeType);
+  } catch (err) {
+    console.warn('[UC] service-worker: Groq attempt 1 failed, retrying in 1 s —', err.message);
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      text = await callGroqWhisper(audioArray, mimeType);
+    } catch (err2) {
+      console.warn('[UC] service-worker: Groq attempt 2 failed, dropping chunk —', err2.message);
+      return;
+    }
+  }
+
+  if (!text || !_activeTabId) return;
+
+  try {
+    await chrome.tabs.sendMessage(_activeTabId, { action: 'show-caption', text });
+  } catch (_) {
+    // Content script context was invalidated (e.g. navigation) — re-inject and retry once
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: _activeTabId },
+        files:  ['content/caption-overlay.js'],
+      });
+      await chrome.tabs.sendMessage(_activeTabId, { action: 'show-caption', text });
+    } catch (err) {
+      console.warn('[UC] service-worker: could not deliver caption —', err.message);
+    }
+  }
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[UC] service-worker: installed/updated');

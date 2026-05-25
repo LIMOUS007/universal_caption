@@ -1,19 +1,9 @@
 console.log('[UC] offscreen-main: loaded');
 
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-let _ws          = null;
-let audioContext = null;
-let sourceNode   = null;
-let workletNode  = null;
-let silentGain   = null;
-let stream       = null;
-
-// PCM accumulation — send 0.5 s chunks to the backend (8 000 samples @ 16 kHz)
-const SEND_SAMPLES = 8_000;
-let _accParts = [];
-let _accLen   = 0;
+let _stream        = null;
+let _audioPlayback = null;
+let _recording     = false;
+let _recorder      = null; // current MediaRecorder for the active 4 s window
 
 // ---------------------------------------------------------------------------
 // Message handler (from service worker)
@@ -22,14 +12,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('[UC] offscreen-main: message', message.action);
 
   if (message.action === 'init-stream') {
-    initAudio(message.streamId, message.config)
-      .then(() => sendResponse({ ok: true }))
-      .catch((err) => {
-        console.error('[UC] offscreen-main: initAudio error', err);
-        _setStatus('error');
-        sendResponse({ ok: false, error: err.message });
-      });
-    return true;
+    const streamId = message.streamId;
+    // Defer out of the message handler — getUserMedia hangs when called
+    // synchronously inside a chrome.runtime.onMessage callback.
+    setTimeout(() => {
+      initAudio(streamId)
+        .then(() => sendResponse({ ok: true }))
+        .catch((err) => {
+          console.error('[UC] offscreen-main: initAudio error', err);
+          try { _setStatus('error'); } catch (_) {}
+          sendResponse({ ok: false, error: err.message });
+        });
+    }, 0);
+    return true; // keep channel open for async sendResponse
   }
 
   if (message.action === 'stop-stream') {
@@ -39,118 +34,72 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // ---------------------------------------------------------------------------
-// Initialise audio pipeline + backend WebSocket
+// Audio capture
 // ---------------------------------------------------------------------------
-async function initAudio(streamId, config) {
-  console.log('[UC] offscreen-main: initAudio()', { streamId, provider: config?.provider });
-
+async function initAudio(streamId) {
+  console.log('[UC] offscreen-main: initAudio() streamId =', streamId);
   _setStatus('connecting');
 
-  // 1. Open WebSocket to backend
-  const wsUrl = `${(config.backendUrl || 'ws://localhost:8000').replace(/\/$/, '')}/ws/transcribe`;
-  _ws = new WebSocket(wsUrl);
-  console.log('[UC] offscreen-main: connecting to', wsUrl);
-
-  await new Promise((resolve, reject) => {
-    _ws.addEventListener('open', resolve, { once: true });
-    _ws.addEventListener('error', (e) => reject(new Error('WebSocket failed to open')), { once: true });
-  });
-  console.log('[UC] offscreen-main: WebSocket open');
-
-  // 2. Send session config
-  _ws.send(JSON.stringify({
-    type:        'session_start',
-    provider:    config.provider    || 'openai_chunked',
-    api_key:     config.apiKey      || '',
-    model:       config.model       || 'whisper-1',
-    sample_rate: 16_000,
-    encoding:    'pcm_f32le',
-  }));
-
-  // 3. Handle messages from backend
-  _ws.addEventListener('message', (event) => {
-    let msg;
-    try { msg = JSON.parse(event.data); } catch { return; }
-    console.log('[UC] offscreen-main: backend →', msg.type, msg.text ?? '');
-
-    switch (msg.type) {
-      case 'session_started':
-        _setStatus('connected');
-        break;
-      case 'transcript':
-      case 'transcript_delta':
-        chrome.runtime.sendMessage({
-          action:  'transcript',
-          text:    msg.text,
-          isFinal: msg.is_final,
-        });
-        break;
-      case 'error':
-        console.error('[UC] offscreen-main: backend error', msg.message);
-        _setStatus('error');
-        break;
-      case 'session_ended':
-        _setStatus('disconnected');
-        break;
-    }
-  });
-
-  _ws.addEventListener('close', () => {
-    console.log('[UC] offscreen-main: WebSocket closed');
-    _setStatus('disconnected');
-  });
-
-  // 4. Acquire tab audio stream
-  stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      mandatory: {
-        chromeMediaSource:   'tab',
-        chromeMediaSourceId: streamId,
+  console.log('[UC] offscreen-main: calling getUserMedia...');
+  _stream = await Promise.race([
+    navigator.mediaDevices.getUserMedia({
+      audio: {
+        mandatory: {
+          chromeMediaSource:   'tab',
+          chromeMediaSourceId: streamId,
+        },
       },
-    },
-    video: false,
-  });
-  console.log('[UC] offscreen-main: stream active =', stream.active,
-    '| tracks:', stream.getAudioTracks().length);
+      video: false,
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('getUserMedia timed out after 10 s')), 10_000)
+    ),
+  ]);
+  console.log('[UC] offscreen-main: getUserMedia OK, tracks:', _stream.getAudioTracks().length);
 
-  // 5. Build Web Audio graph
-  audioContext = new AudioContext({ sampleRate: 16_000 });
-  await audioContext.audioWorklet.addModule(
-    chrome.runtime.getURL('offscreen/audio-processor.js'),
-  );
-  console.log('[UC] offscreen-main: AudioWorklet module loaded');
+  // Play the captured stream back so the user can still hear the tab
+  _audioPlayback = new Audio();
+  _audioPlayback.srcObject = _stream;
+  _audioPlayback.play();
 
-  sourceNode = audioContext.createMediaStreamSource(stream);
-  workletNode = new AudioWorkletNode(audioContext, 'uc-processor');
+  const mimeType = 'audio/webm;codecs=opus';
+  console.log('[UC] offscreen-main: MediaRecorder.isTypeSupported:', MediaRecorder.isTypeSupported(mimeType));
 
-  // 6. Accumulate PCM chunks and forward to backend over WebSocket
-  workletNode.port.onmessage = (event) => {
-    const chunk = /** @type {Float32Array} */ (event.data);
-    _accParts.push(chunk);
-    _accLen += chunk.length;
+  _recording = true;
+  _setStatus('connected');
+  console.log('[UC] offscreen-main: starting record loop');
+  recordLoop(mimeType); // fire-and-forget; runs until _recording = false
+}
 
-    if (_accLen >= SEND_SAMPLES) {
-      const combined = new Float32Array(_accLen);
-      let off = 0;
-      for (const c of _accParts) { combined.set(c, off); off += c.length; }
+// ---------------------------------------------------------------------------
+// Record loop — stop-and-restart so each blob is a complete WebM file.
+// Using timeslice (start(N)) produces headerless fragments that Groq rejects.
+// ---------------------------------------------------------------------------
+async function recordLoop(mimeType) {
+  while (_recording && _stream?.active) {
+    const blob = await new Promise((resolve) => {
+      _recorder = new MediaRecorder(_stream, { mimeType });
+      _recorder.addEventListener('dataavailable', (e) => resolve(e.data), { once: true });
+      _recorder.start();
+      setTimeout(() => {
+        if (_recorder?.state === 'recording') _recorder.stop();
+      }, 4000);
+    });
 
-      if (_ws?.readyState === WebSocket.OPEN) {
-        _ws.send(combined.buffer);
-      }
+    console.log('[UC] offscreen-main: chunk — size:', blob.size, 'type:', blob.type);
+    if (!_recording) break;        // stopped while we were recording
+    if (blob.size < 1000) continue; // empty / near-empty chunk
 
-      _accParts = [];
-      _accLen   = 0;
-    }
-  };
+    const arrayBuffer  = await blob.arrayBuffer();
+    const regularArray = Array.from(new Uint8Array(arrayBuffer));
+    chrome.runtime.sendMessage({
+      action:     'transcribe-chunk',
+      audioArray: regularArray,
+      mimeType:   blob.type,
+    }).catch(() => {});
+  }
 
-  // Silent gain keeps the graph active without playing audio back to speakers
-  silentGain = audioContext.createGain();
-  silentGain.gain.value = 0;
-  sourceNode.connect(workletNode);
-  workletNode.connect(silentGain);
-  silentGain.connect(audioContext.destination);
-
-  console.log('[UC] offscreen-main: audio pipeline connected — streaming to backend');
+  console.log('[UC] offscreen-main: record loop ended');
 }
 
 // ---------------------------------------------------------------------------
@@ -159,37 +108,26 @@ async function initAudio(streamId, config) {
 function stopAudio() {
   console.log('[UC] offscreen-main: stopAudio()');
 
-  if (_ws) {
-    if (_ws.readyState === WebSocket.OPEN) {
-      _ws.send(JSON.stringify({ type: 'session_end' }));
-      _ws.close();
-    }
-    _ws = null;
+  _recording = false;
+  if (_recorder?.state === 'recording') _recorder.stop();
+  _stream?.getTracks().forEach((t) => t.stop());
+  if (_audioPlayback) {
+    _audioPlayback.pause();
+    _audioPlayback.srcObject = null;
   }
 
-  workletNode?.port.close();
-  workletNode?.disconnect();
-  silentGain?.disconnect();
-  sourceNode?.disconnect();
-  stream?.getTracks().forEach((t) => t.stop());
-  audioContext?.close();
-
-  audioContext = null;
-  sourceNode   = null;
-  workletNode  = null;
-  silentGain   = null;
-  stream       = null;
-  _accParts    = [];
-  _accLen      = 0;
+  _recorder      = null;
+  _stream        = null;
+  _audioPlayback = null;
 
   _setStatus('disconnected');
   console.log('[UC] offscreen-main: audio pipeline torn down');
 }
 
 // ---------------------------------------------------------------------------
-// Status helper — writes to storage so the popup can read it
+// Status helper — offscreen documents cannot access chrome.storage directly.
+// The service worker receives 'connection-status' and writes to storage there.
 // ---------------------------------------------------------------------------
 function _setStatus(status) {
-  chrome.storage.local.set({ wsStatus: status });
-  chrome.runtime.sendMessage({ action: 'connection-status', status });
+  chrome.runtime.sendMessage({ action: 'connection-status', status }).catch(() => {});
 }

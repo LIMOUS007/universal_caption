@@ -2,7 +2,7 @@ console.log('[UC] popup: loaded');
 
 const btn              = document.getElementById('toggle-btn');
 const providerEl       = document.getElementById('provider');
-const apiKeyEl         = document.getElementById('api-key');
+const groqApiKeyEl         = document.getElementById('api-key');
 const backendEl        = document.getElementById('backend-url');
 const statusDot        = document.getElementById('status-dot');
 const statusText       = document.getElementById('status-text');
@@ -20,12 +20,12 @@ let isCapturing = false;
 // Restore persisted config + state
 // ---------------------------------------------------------------------------
 chrome.storage.local.get(
-  ['capturing', 'wsStatus', 'provider', 'apiKey', 'backendUrl', 'overlayConfig'],
+  ['capturing', 'wsStatus', 'provider', 'groqApiKey', 'backendUrl', 'overlayConfig'],
   (data) => {
     console.log('[UC] popup: restored storage', data);
     isCapturing          = !!data.capturing;
     providerEl.value     = data.provider    || 'openai_chunked';
-    apiKeyEl.value       = data.apiKey      || '';
+    groqApiKeyEl.value       = data.groqApiKey      || '';
     backendEl.value      = data.backendUrl  || 'ws://localhost:8000';
     updateStatus(data.wsStatus || 'disconnected');
     syncButton();
@@ -50,8 +50,8 @@ chrome.storage.local.get(
 providerEl.addEventListener('change', () =>
   chrome.storage.local.set({ provider: providerEl.value }),
 );
-apiKeyEl.addEventListener('input', () =>
-  chrome.storage.local.set({ apiKey: apiKeyEl.value }),
+groqApiKeyEl.addEventListener('input', () =>
+  chrome.storage.local.set({ groqApiKey: groqApiKeyEl.value }),
 );
 backendEl.addEventListener('input', () =>
   chrome.storage.local.set({ backendUrl: backendEl.value }),
@@ -107,11 +107,11 @@ btn.addEventListener('click', async () => {
   if (!isCapturing) {
     const config = {
       provider:   providerEl.value,
-      apiKey:     apiKeyEl.value,
+      groqApiKey:     groqApiKeyEl.value,
       backendUrl: backendEl.value,
       model:      'whisper-1',
     };
-    console.log('[UC] popup: sending start with config', { ...config, apiKey: '***' });
+    console.log('[UC] popup: sending start with config', { ...config, groqApiKey: '***' });
     chrome.runtime.sendMessage({ action: 'start', tabId: tab.id, config }, (response) => {
       console.log('[UC] popup: start response', response);
       if (response?.ok) {
