@@ -29,5 +29,12 @@
       "js": ["content/caption-overlay.js"],
       "run_at": "document_idle"
     }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["pip/pip-window.html"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

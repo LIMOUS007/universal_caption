@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    #caption-box {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.72);
+      color: #fff;
+      font-size: 22px;
+      font-family: system-ui, sans-serif;
+      line-height: 1.4;
+      padding: 16px 24px;
+      border-radius: 10px;
+      max-width: 90%;
+      word-wrap: break-word;
+      cursor: grab;
+      user-select: none;
+      transition: opacity 0.15s ease;
+    }
+
+    #caption-box.dragging { cursor: grabbing; }
+  </style>
+</head>
+<body>
+  <div id="caption-box">Captions will appear here…</div>
+
+  <script>
+    const box = document.getElementById('caption-box');
+
+    // ---------------------------------------------------------------------------
+    // Receive caption text from the content script
+    // ---------------------------------------------------------------------------
+    window.addEventListener('message', (e) => {
+      if (e.data?.type === 'caption') {
+        box.textContent = e.data.text;
+        box.style.opacity = '1';
+      }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Drag — mousedown converts the centered transform to explicit left/top,
+    // then tracks delta on mousemove
+    // ---------------------------------------------------------------------------
+    let dragging = false;
+    let startMouseX, startMouseY, startBoxLeft, startBoxTop;
+
+    box.addEventListener('mousedown', (e) => {
+      dragging = true;
+      box.classList.add('dragging');
+
+      const rect = box.getBoundingClientRect();
+      startBoxLeft  = rect.left;
+      startBoxTop   = rect.top;
+      startMouseX   = e.clientX;
+      startMouseY   = e.clientY;
+
+      // Switch from transform-based centering to explicit coordinates
+      box.style.transform = 'none';
+      box.style.left      = startBoxLeft + 'px';
+      box.style.top       = startBoxTop  + 'px';
+      box.style.bottom    = 'auto';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      box.style.left = (startBoxLeft + e.clientX - startMouseX) + 'px';
+      box.style.top  = (startBoxTop  + e.clientY - startMouseY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      box.classList.remove('dragging');
+    });
+  </script>
+</body>
+</html>

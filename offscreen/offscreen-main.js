@@ -83,12 +83,12 @@ async function recordLoop(mimeType) {
       _recorder.start();
       setTimeout(() => {
         if (_recorder?.state === 'recording') _recorder.stop();
-      }, 4000);
+      }, 2000);
     });
 
     console.log('[UC] offscreen-main: chunk — size:', blob.size, 'type:', blob.type);
     if (!_recording) break;        // stopped while we were recording
-    if (blob.size < 1000) continue; // empty / near-empty chunk
+    if (blob.size < 5000) continue; // silent / near-empty chunk — skip to avoid wasting API calls
 
     const arrayBuffer  = await blob.arrayBuffer();
     const regularArray = Array.from(new Uint8Array(arrayBuffer));

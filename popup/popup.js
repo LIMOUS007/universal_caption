@@ -111,6 +111,10 @@ btn.addEventListener('click', async () => {
       backendUrl: backendEl.value,
       model:      'whisper-1',
     };
+    // Send open-pip directly to the content script while the popup click
+    // user-gesture is still active — service worker would break the gesture chain
+    chrome.tabs.sendMessage(tab.id, { action: 'open-pip' }).catch(() => {});
+
     console.log('[UC] popup: sending start with config', { ...config, groqApiKey: '***' });
     chrome.runtime.sendMessage({ action: 'start', tabId: tab.id, config }, (response) => {
       console.log('[UC] popup: start response', response);
@@ -122,6 +126,7 @@ btn.addEventListener('click', async () => {
     });
   } else {
     console.log('[UC] popup: sending stop');
+    chrome.tabs.sendMessage(tab.id, { action: 'close-pip' }).catch(() => {});
     chrome.runtime.sendMessage({ action: 'stop' }, (response) => {
       console.log('[UC] popup: stop response', response);
       isCapturing = false;
