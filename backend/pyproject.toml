@@ -11,4 +11,5 @@ dependencies = [
     "redis[asyncio]>=5.2.0",
     "openai>=1.57.0",
     "pydantic-settings>=2.7.0",
+    "asyncio>=4.0.0",
 ]
