@@ -2,13 +2,19 @@
 // No DOM, no Chrome APIs, no import/require available in this scope.
 
 class UCProcessor extends AudioWorkletProcessor {
-  process(inputs, _outputs, _parameters) {
-    const channel = inputs[0]?.[0]; // first input port, left/mono channel
-    if (channel?.length) {
-      // slice() copies the data out of the shared buffer before it is recycled
-      this.port.postMessage(channel.slice());
+  constructor() {
+    super();
+    this._buf = [];
+    this._TARGET = 32000; // 2s at 16kHz
+  }
+
+  process(inputs) {
+    const ch = inputs[0]?.[0];
+    if (!ch?.length) return true;
+    for (let i = 0; i < ch.length; i++) this._buf.push(ch[i]);
+    if (this._buf.length >= this._TARGET) {
+      this.port.postMessage(new Float32Array(this._buf.splice(0, this._TARGET)));
     }
-    // Returning true keeps the processor alive indefinitely
     return true;
   }
 }

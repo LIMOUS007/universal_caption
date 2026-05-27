@@ -36,6 +36,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 // Audio capture via AudioContext & AudioWorklet
 // ---------------------------------------------------------------------------
+function getRMS(float32Array) {
+  let sum = 0;
+  for (let i = 0; i < float32Array.length; i++) {
+    sum += float32Array[i] * float32Array[i];
+  }
+  return Math.sqrt(sum / float32Array.length);
+}
+
 async function initAudio(streamId) {
   console.log('[UC] offscreen-main: initAudio() streamId =', streamId);
   _setStatus('connecting');
@@ -79,14 +87,18 @@ async function initAudio(streamId) {
   // 4. When the processor spits out raw Float32 audio, send it to the Service Worker
   processor.port.onmessage = (event) => {
     if (!_recording) return;
-    
-    // The AudioWorklet sends a Float32Array. We convert it to a standard Array 
-    // because Chrome's extension message passing strips out TypedArrays.
-    const float32Array = event.data; 
-    
+
+    const float32Array = event.data;
+
+    const rms = getRMS(float32Array);
+    if (rms < 0.01) {
+      console.debug('[UC] Skipping silent chunk, RMS:', rms);
+      return;
+    }
+
     chrome.runtime.sendMessage({
       action: 'audio-stream-data',
-      audioData: Array.from(float32Array) 
+      audioData: Array.from(float32Array)
     }).catch(() => {});
   };
 

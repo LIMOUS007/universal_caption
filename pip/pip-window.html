@@ -13,77 +13,206 @@
     }
 
     #caption-box {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.72);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.78);
       color: #fff;
-      font-size: 22px;
-      font-family: system-ui, sans-serif;
-      line-height: 1.4;
-      padding: 16px 24px;
-      border-radius: 10px;
-      max-width: 90%;
-      word-wrap: break-word;
-      cursor: grab;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       user-select: none;
-      transition: opacity 0.15s ease;
+      cursor: grab;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-height: 44px;
     }
 
     #caption-box.dragging { cursor: grabbing; }
+
+    #caption-text {
+      display: none;
+      word-wrap: break-word;
+      text-align: center;
+      padding: 0 32px;
+      max-width: 100%;
+    }
+
+    /* Close button — top-left, visible on hover only */
+    #close-btn {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      width: 20px;
+      height: 20px;
+      font-size: 16px;
+      line-height: 20px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: rgba(255, 255, 255, 0.5);
+      padding: 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    #caption-box:hover #close-btn { opacity: 1; }
+    #close-btn:hover { color: #fff; }
+
+    /* Resize handle — bottom-right corner */
+    #resize-handle {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 14px;
+      height: 14px;
+      cursor: se-resize;
+      opacity: 0.5;
+      background: linear-gradient(
+        135deg,
+        transparent 33%, rgba(255,255,255,0.6) 33%,
+        rgba(255,255,255,0.6) 40%, transparent 40%,
+        transparent 60%, rgba(255,255,255,0.6) 60%,
+        rgba(255,255,255,0.6) 67%, transparent 67%
+      );
+    }
+
+    #resize-handle:hover { opacity: 1; }
+
+    /* Listening indicator */
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.7; }
+    }
+
+    #listening-indicator {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.6);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
   </style>
 </head>
 <body>
-  <div id="caption-box">Captions will appear here…</div>
+  <div id="caption-box">
+    <button id="close-btn" title="Stop captions">&#xD7;</button>
+    <span id="caption-text"></span>
+    <div id="listening-indicator"></div>
+    <div id="resize-handle"></div>
+  </div>
 
   <script>
-    const box = document.getElementById('caption-box');
+    const box       = document.getElementById('caption-box');
+    const textEl    = document.getElementById('caption-text');
+    const closeBtn  = document.getElementById('close-btn');
+    const resizeHdl = document.getElementById('resize-handle');
+    const indicator = document.getElementById('listening-indicator');
 
-    // ---------------------------------------------------------------------------
-    // Receive caption text from the content script
-    // ---------------------------------------------------------------------------
-    window.addEventListener('message', (e) => {
-      if (e.data?.type === 'caption') {
-        box.textContent = e.data.text;
-        box.style.opacity = '1';
+    // -------------------------------------------------------------------------
+    // Restore saved position / width — moves the actual PiP window
+    // -------------------------------------------------------------------------
+    const savedScreenX = localStorage.getItem('uc-pip-screenX');
+    const savedScreenY = localStorage.getItem('uc-pip-screenY');
+    const savedWidth   = localStorage.getItem('uc-pip-width');
+
+    if (savedScreenX !== null && savedScreenY !== null) {
+      window.moveTo(parseInt(savedScreenX), parseInt(savedScreenY));
+    }
+    if (savedWidth !== null) {
+      window.resizeTo(parseInt(savedWidth), window.outerHeight);
+    }
+
+    // -------------------------------------------------------------------------
+    // Caption handling — show text, hide indicator; revert after 3s idle
+    // -------------------------------------------------------------------------
+    let indicatorTimeout = null;
+
+    document.addEventListener('new-caption', (e) => {
+      clearTimeout(indicatorTimeout);
+      textEl.textContent      = e.detail.text;
+      textEl.style.display    = 'block';
+      indicator.style.display = 'none';
+
+      indicatorTimeout = setTimeout(() => {
+        textEl.style.display    = 'none';
+        indicator.style.display = 'inline-block';
+      }, 3000);
+    });
+
+    // -------------------------------------------------------------------------
+    // Close button — notifies opener to stop the session
+    // -------------------------------------------------------------------------
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.opener) {
+        window.opener.postMessage({ type: 'pip-close-requested' }, '*');
       }
     });
 
-    // ---------------------------------------------------------------------------
-    // Drag — mousedown converts the centered transform to explicit left/top,
-    // then tracks delta on mousemove
-    // ---------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Drag — moves the PiP window itself via window.moveTo()
+    // -------------------------------------------------------------------------
     let dragging = false;
-    let startMouseX, startMouseY, startBoxLeft, startBoxTop;
+    let dragStartScreenX, dragStartScreenY, winStartX, winStartY;
 
     box.addEventListener('mousedown', (e) => {
+      if (e.target.closest('#close-btn, #resize-handle')) return;
       dragging = true;
       box.classList.add('dragging');
-
-      const rect = box.getBoundingClientRect();
-      startBoxLeft  = rect.left;
-      startBoxTop   = rect.top;
-      startMouseX   = e.clientX;
-      startMouseY   = e.clientY;
-
-      // Switch from transform-based centering to explicit coordinates
-      box.style.transform = 'none';
-      box.style.left      = startBoxLeft + 'px';
-      box.style.top       = startBoxTop  + 'px';
-      box.style.bottom    = 'auto';
+      dragStartScreenX = e.screenX;
+      dragStartScreenY = e.screenY;
+      winStartX        = window.screenX;
+      winStartY        = window.screenY;
+      e.preventDefault();
     });
 
     document.addEventListener('mousemove', (e) => {
       if (!dragging) return;
-      box.style.left = (startBoxLeft + e.clientX - startMouseX) + 'px';
-      box.style.top  = (startBoxTop  + e.clientY - startMouseY) + 'px';
+      window.moveTo(
+        winStartX + (e.screenX - dragStartScreenX),
+        winStartY + (e.screenY - dragStartScreenY)
+      );
     });
 
     document.addEventListener('mouseup', () => {
       if (!dragging) return;
       dragging = false;
       box.classList.remove('dragging');
+      localStorage.setItem('uc-pip-screenX', window.screenX);
+      localStorage.setItem('uc-pip-screenY', window.screenY);
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize — resizes the PiP window itself via window.resizeTo()
+    // -------------------------------------------------------------------------
+    let resizing = false;
+    let resizeStartScreenX, resizeStartWidth;
+
+    resizeHdl.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      resizing          = true;
+      resizeStartScreenX = e.screenX;
+      resizeStartWidth  = window.outerWidth;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!resizing) return;
+      const newWidth = Math.min(800, Math.max(200, resizeStartWidth + (e.screenX - resizeStartScreenX)));
+      window.resizeTo(newWidth, window.outerHeight);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!resizing) return;
+      resizing = false;
+      localStorage.setItem('uc-pip-width', window.outerWidth);
     });
   </script>
 </body>

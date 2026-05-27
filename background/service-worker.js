@@ -36,12 +36,28 @@ async function ensureOffscreenDocument() {
   });
 }
 
+
 // ---------------------------------------------------------------------------
 // Start Pipeline
 // ---------------------------------------------------------------------------
 async function handleStart(tabId, config) {
   console.log('[UC] service-worker: handleStart() tabId =', tabId);
+
+  // Single-session enforcement — stop existing session before starting new one
+  if (_activeTabId && _activeTabId !== tabId) {
+    console.log('[UC] service-worker: switching session from tab', _activeTabId, 'to', tabId);
+    deliverCaptionToTab('Switching source…');
+    await handleStop();
+    // Signal popup on new tab to show the switch notice
+    await chrome.storage.local.set({ statusMessage: 'Switched caption source to this tab' });
+  }
+
   _activeTabId = tabId;
+
+  // Store tab title (truncated to 30 chars) for popup display
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  const title = (tab?.title ?? 'this tab').slice(0, 30);
+  await chrome.storage.local.set({ captioningTabTitle: title });
 
   // 1. Establish the persistent WebSocket connection to FastAPI
   const baseUrl = config.backendUrl || 'ws://localhost:8000';
@@ -50,22 +66,21 @@ async function handleStart(tabId, config) {
   _ws.onopen = () => {
     console.log('[UC] service-worker: WebSocket connected');
     chrome.storage.local.set({ wsStatus: 'connected' });
-    
-    // Handshake: Match the exact payload your python backend expects
+
+    // Handshake: match the exact payload the python backend expects
     _ws.send(JSON.stringify({
-      type:        "session_start",
-      provider:    config.provider || "openai_chunked",
-      api_key:     config.groqApiKey || "",
-      model:       config.model || "whisper-1",
+      type:        'session_start',
+      provider:    config.provider || 'openai_chunked',
+      api_key:     config.apiKey || '',
+      model:       config.model || 'whisper-1',
       sample_rate: 16000,
-      encoding:    "pcm_f32le"
+      encoding:    'pcm_f32le',
     }));
   };
 
   _ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      
       if (data.type === 'transcript_delta' || data.type === 'transcript') {
         if (data.text) deliverCaptionToTab(data.text);
       } else if (data.type === 'error') {
@@ -102,7 +117,7 @@ async function handleStart(tabId, config) {
     streamId,
     config,
   });
-  
+
   if (!response?.ok) {
     throw new Error(response?.error ?? 'offscreen init failed');
   }
@@ -116,7 +131,7 @@ async function handleStop() {
 
   // Gracefully terminate the WebSocket session
   if (_ws && _ws.readyState === WebSocket.OPEN) {
-    _ws.send(JSON.stringify({ type: "session_end" }));
+    _ws.send(JSON.stringify({ type: 'session_end' }));
     _ws.close();
   }
   _ws = null;
@@ -129,7 +144,11 @@ async function handleStop() {
   }
 
   await chrome.offscreen.closeDocument().catch(() => {});
-  await chrome.storage.local.set({ wsStatus: 'disconnected' });
+  await chrome.storage.local.set({
+    wsStatus:           'disconnected',
+    captioningTabTitle: null,
+    capturing:          false,
+  });
   console.log('[UC] service-worker: offscreen document closed');
 }
 
@@ -184,7 +203,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // into the FastAPI websocket connection.
       if (_ws && _ws.readyState === WebSocket.OPEN) {
         const float32Array = new Float32Array(message.audioData);
-        _ws.send(float32Array.buffer); 
+        _ws.send(float32Array.buffer);
       }
       break;
 

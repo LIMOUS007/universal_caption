@@ -46,7 +46,7 @@
       border-radius: 5px;
       background: #fafafa;
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, opacity 0.2s;
     }
 
     select:focus, input:focus {
@@ -54,12 +54,19 @@
       background: #fff;
     }
 
+    /* Lock config fields while capturing */
+    .field.locked select,
+    .field.locked input {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
     /* ---- status bar ---- */
     #status-bar {
       display: flex;
       align-items: center;
       gap: 6px;
-      margin: 10px 0;
+      margin: 10px 0 4px;
       padding: 5px 8px;
       background: #f5f5f5;
       border-radius: 5px;
@@ -80,24 +87,55 @@
     #status-dot.connected  { background: #34a853; }
     #status-dot.error      { background: #d93025; }
 
-    /* ---- toggle button ---- */
-    #toggle-btn {
-      width: 100%;
+    #caption-source {
+      color: #888;
+      font-style: italic;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ---- switch notice ---- */
+    #switch-notice {
+      display: none;
+      font-size: 11px;
+      color: #1a73e8;
+      padding: 3px 8px 6px;
+      text-align: center;
+    }
+
+    /* ---- buttons ---- */
+    #btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    #btn-row button {
+      flex: 1;
       padding: 9px;
       font-size: 13px;
       font-weight: 600;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      background: #1a73e8;
-      color: #fff;
       transition: background 0.15s, opacity 0.15s;
     }
 
-    #toggle-btn.active  { background: #d93025; }
-    #toggle-btn:hover   { opacity: 0.88; }
-    #toggle-btn:disabled {
-      opacity: 0.5;
+    #start-btn {
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    #stop-btn {
+      background: #d93025;
+      color: #fff;
+    }
+
+    #btn-row button:hover:not(:disabled) { opacity: 0.88; }
+
+    #btn-row button:disabled {
+      opacity: 0.4;
       cursor: default;
     }
 
@@ -117,26 +155,26 @@
       margin: 3px 0 0;
       accent-color: #1a73e8;
     }
+
   </style>
 </head>
 <body>
   <h1>Universal Captions</h1>
 
-  <div class="field">
+  <div class="field" id="field-provider">
     <label for="provider">Provider</label>
     <select id="provider">
       <option value="openai_chunked">OpenAI Whisper (chunked)</option>
       <option value="openai_realtime">OpenAI Realtime</option>
-      <option value="local_whisper">Local Whisper</option>
     </select>
   </div>
 
-  <div class="field">
-    <label for="api-key">Groq API Key</label>
-    <input type="password" id="api-key" placeholder="gsk_…" autocomplete="off" spellcheck="false" />
+  <div class="field" id="field-api-key">
+    <label for="api-key">API Key</label>
+    <input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" />
   </div>
 
-  <div class="field">
+  <div class="field" id="field-backend-url">
     <label for="backend-url">Backend URL</label>
     <input type="url" id="backend-url" value="ws://localhost:8000" />
   </div>
@@ -146,16 +184,6 @@
   <div class="field">
     <label for="font-size">Font Size — <span id="font-size-val">18</span>px</label>
     <input type="range" id="font-size" min="12" max="32" value="18" />
-  </div>
-
-  <div class="field">
-    <label for="ov-position">Position</label>
-    <select id="ov-position">
-      <option value="bottom">Bottom Center</option>
-      <option value="top">Top Center</option>
-      <option value="bottom-left">Bottom Left</option>
-      <option value="bottom-right">Bottom Right</option>
-    </select>
   </div>
 
   <div class="field">
@@ -171,9 +199,15 @@
   <div id="status-bar">
     <span id="status-dot"></span>
     <span id="status-text">Not connected</span>
+    <span id="caption-source"></span>
   </div>
 
-  <button id="toggle-btn">Start Captions</button>
+  <div id="switch-notice">Switched caption source to this tab</div>
+
+  <div id="btn-row">
+    <button id="start-btn">Start Captions</button>
+    <button id="stop-btn" disabled>Stop Captions</button>
+  </div>
 
   <script src="popup.js"></script>
 </body>

@@ -26,6 +26,8 @@ CREATE TABLE transcript_segments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX idx_segments_session_id ON transcript_segments(session_id);
+
 CREATE TABLE usage_events (
     id UUID PRIMARY KEY,
     user_id UUID,
