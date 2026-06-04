@@ -22,12 +22,6 @@ Universal Captions captures the audio from any active browser tab using the Chro
 2. Paste your [Groq API key](https://console.groq.com/keys) into the API key field.
 3. The key is stored locally via `chrome.storage.local` and never leaves your browser except in direct requests to the Groq API.
 
-## Current status
-
-**Phase 2 complete — audio capture working.**
-
-The full pipeline from tab audio → PCM extraction → offscreen AudioWorklet is functional. Float32 PCM chunks are flowing and logged to the DevTools console. Groq Whisper integration and caption rendering are next.
-
 ## Tech stack
 
 | Layer | Technology |
@@ -38,19 +32,3 @@ The full pipeline from tab audio → PCM extraction → offscreen AudioWorklet i
 | Transcription | Groq Whisper (`whisper-large-v3-turbo`) |
 | Overlay rendering | Content script + injected DOM |
 
-## Roadmap
-
-### V1
-- [ ] Groq Whisper API integration (streaming PCM → transcript chunks)
-- [ ] Caption overlay rendered on the active tab
-- [ ] API key input in the popup
-- [ ] Start/Stop reliably persisted across popup open/close
-- [ ] Basic overlay styling (position, font size, background opacity)
-
-### V2
-- [ ] Language auto-detection and manual language selector
-- [ ] Speaker diarisation (distinguish multiple speakers)
-- [ ] Export transcript as `.txt` or `.srt` file
-- [ ] Caption history panel in the popup
-- [ ] Configurable overlay position (top / bottom / sides)
-- [ ] Support for video-call tabs (Meet, Zoom web, Teams)
