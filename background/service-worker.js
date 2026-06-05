@@ -5,6 +5,13 @@ console.log('[UC] service-worker: loaded');
 // ---------------------------------------------------------------------------
 let _activeTabId = null;
 let _ws          = null;
+let _isPinned    = false;
+
+// Keep pin state in sync so deliverCaptionToTab knows whether to broadcast.
+chrome.storage.local.get('overlayPinned', ({ overlayPinned }) => { _isPinned = !!overlayPinned; });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && 'overlayPinned' in changes) _isPinned = !!changes.overlayPinned.newValue;
+});
 
 // ---------------------------------------------------------------------------
 // Keepalive — prevents the service worker from sleeping mid-session.
@@ -148,6 +155,7 @@ async function handleStop() {
     wsStatus:           'disconnected',
     captioningTabTitle: null,
     capturing:          false,
+    overlayPinned:      false,
   });
   console.log('[UC] service-worker: offscreen document closed');
 }
@@ -157,6 +165,17 @@ async function handleStop() {
 // ---------------------------------------------------------------------------
 async function deliverCaptionToTab(text) {
   if (!_activeTabId) return;
+
+  if (_isPinned) {
+    // Broadcast to all normal tabs; content script ignores if it has no overlay.
+    const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+    const ids  = new Set(tabs.map(t => t.id));
+    ids.add(_activeTabId); // ensure capture tab is always included
+    for (const id of ids) {
+      chrome.tabs.sendMessage(id, { action: 'show-caption', text }).catch(() => {});
+    }
+    return;
+  }
 
   try {
     await chrome.tabs.sendMessage(_activeTabId, { action: 'show-caption', text });

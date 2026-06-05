@@ -72,6 +72,10 @@ chrome.storage.local.get(
             textOpacity: txo / 100,
           },
         }).catch(() => {});
+        // Port disconnect fires in the content script when popup closes —
+        // more reliable than storage.set in the unload handler.
+        try { chrome.tabs.connect(tab.id, { name: 'preview-lifecycle' }); } catch (_) {}
+        chrome.storage.local.set({ previewActive: true });
       });
     }
   },
@@ -216,3 +220,12 @@ function showSwitchNotice() {
     switchNotice.style.display = 'none';
   }, 3000);
 }
+
+// Remove preview overlay when popup closes without starting.
+// chrome.tabs.sendMessage is async and dies before unload completes —
+// storage.set is a synchronous IPC call that Chrome queues even during teardown.
+window.addEventListener('unload', () => {
+  if (!isCapturing) {
+    chrome.storage.local.set({ previewActive: false });
+  }
+});
