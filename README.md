@@ -1,95 +1,157 @@
 # Universal Captions
 
-Real-time speech-to-text captions overlaid on any Chrome tab.
+Real-time speech-to-text captions overlaid on any Chrome tab — YouTube, Google Meet, Zoom, podcasts, lectures, anything with audio.
 
-## How it works
+---
 
-Universal Captions captures audio from any active browser tab using the Chrome `tabCapture` API, routes it through an offscreen document where an `AudioWorkletNode` extracts 16 kHz PCM frames, and streams those frames over a WebSocket to a FastAPI backend. The backend transcribes the audio using OpenAI Whisper and returns transcript text to the extension. A content script injects the captions into the page as a draggable Shadow DOM overlay that is isolated from the host page's CSS.
+## What you need before starting
 
-The service worker stays alive between chunks using `chrome.alarms`, so long sessions don't drop mid-sentence.
+- **A computer running Windows, Mac, or Linux**
+- **Google Chrome** (or any Chromium-based browser like Edge, Brave)
+- **Docker Desktop** — this runs the backend server that does the transcription
+  - [Download Docker Desktop for Windows/Mac](https://www.docker.com/products/docker-desktop/)
+  - Linux: follow the [Docker Engine install guide](https://docs.docker.com/engine/install/)
+- **An OpenAI API key** — used for Whisper transcription
+  - Get one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (requires a free OpenAI account)
 
-## Features
+---
 
-- **Live captions on any tab** — works on YouTube, Google Meet, Zoom web, podcasts, lectures, or any audio-playing page
-- **Draggable, resizable overlay** — reposition and resize the caption box; position is saved across sessions
-- **Pin mode** — lock the overlay to stay visible across all tabs simultaneously
-- **Language selection** — 16 languages supported; auto-detects by default
-- **Silent-frame filtering** — RMS-based silence detection skips quiet chunks to reduce API overhead
-- **Single-session enforcement** — switching to a new tab automatically stops the previous session with a brief on-screen notice
-- **Overlay appearance controls** — font size (0–500px), background opacity, and text opacity adjustable from the popup
-- **Keyboard shortcut** — `Alt+Shift+C` toggles captions from anywhere without opening the popup
+## Setup — step by step
 
-## Setup
+### Step 1 — Download this repository
 
-### 1. Install the extension
-
-1. Clone or download this repository.
-2. Open Chrome and navigate to `chrome://extensions`.
-3. Enable **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select the repository root folder.
-5. The Universal Captions icon will appear in your toolbar.
-
-### 2. Start the backend
-
-The extension needs a running backend to transcribe audio.
-
+**Option A: with Git**
 ```bash
-# Copy the env file (no changes needed — API key is entered in the popup, not here)
-cp backend/.env.example backend/.env
+git clone https://github.com/LIMOUS007/universal_caption.git
+cd universal_caption
+```
 
-# Start with Docker (recommended)
+**Option B: without Git**
+- Click the green **Code** button on this GitHub page → **Download ZIP**
+- Unzip it somewhere easy to find (e.g. your Desktop)
+
+---
+
+### Step 2 — Start the backend server
+
+The backend handles audio transcription. You need to start it once before using the extension.
+
+**Make sure Docker Desktop is open and running first.**
+
+Then open a terminal in the repository folder and run:
+
+**Mac / Linux:**
+```bash
+cp backend/.env.example backend/.env
 docker-compose up --build
 ```
 
-The API will be available at `http://localhost:8000`. See [backend/README.md](backend/README.md) for non-Docker setup.
+**Windows (Command Prompt):**
+```cmd
+copy backend\.env.example backend\.env
+docker-compose up --build
+```
 
-### 3. Configure the popup
+**Windows (PowerShell):**
+```powershell
+Copy-Item backend\.env.example backend\.env
+docker-compose up --build
+```
 
-1. Click the Universal Captions toolbar icon.
-2. Paste your [OpenAI API key](https://platform.openai.com/api-keys) into the **API Key** field.
-3. Select a **Language** (or leave on Auto-detect).
-4. Adjust font size and opacity if desired.
-5. Backend URL defaults to `ws://localhost:8000` — change it under **Advanced** only if your backend runs elsewhere.
+The first run downloads dependencies and may take a few minutes. When you see a line like `Uvicorn running on http://0.0.0.0:8000`, the backend is ready.
 
-### 4. Start captions
+> **Every time you want to use the extension**, open Docker Desktop and run `docker-compose up` in the repository folder. You can stop it with `Ctrl+C`.
 
-1. Navigate to any tab with audio.
-2. Click **Start Captions** in the popup, or press `Alt+Shift+C`.
-3. The status dot turns green when connected. Captions will appear in the floating overlay within ~2 seconds.
+---
+
+### Step 3 — Load the extension in Chrome
+
+1. Open Chrome and go to `chrome://extensions`
+2. Turn on **Developer mode** using the toggle in the top-right corner
+3. Click **Load unpacked**
+4. Select the repository root folder (the one containing `manifest.json`)
+5. The Universal Captions icon will appear in your Chrome toolbar
+
+> If you don't see the icon, click the puzzle-piece icon in the toolbar and pin Universal Captions.
+
+---
+
+### Step 4 — Add your API key
+
+1. Click the Universal Captions icon in the toolbar
+2. Paste your OpenAI API key into the **API Key** field
+3. Choose a **Language** or leave it on **Auto-detect**
+4. Leave **Backend URL** as `ws://localhost:8000` (only change this if you're running the backend on a different machine)
+
+Your key is only sent to your own local backend — it is never stored or shared.
+
+---
+
+### Step 5 — Start captions
+
+1. Go to any tab that's playing audio (YouTube, a video call, a podcast, etc.)
+2. Click **Start Captions** in the popup, or press `Alt+Shift+C`
+3. The status dot turns **green** when connected
+4. Captions appear as a floating overlay on the page within ~2 seconds
+
+---
+
+## Overlay controls
+
+| Action | What it does |
+|---|---|
+| Drag the caption box | Move it anywhere on the screen |
+| Drag the left or right edge | Resize the width |
+| Click 📌 (pin) | Keep the overlay visible across all tabs |
+| Click × (close) | Stop captions and dismiss the overlay |
+| `Alt+Shift+C` | Toggle captions without opening the popup |
+
+Font size, background opacity, and text opacity are all adjustable from the popup.
+
+---
+
+## Troubleshooting
+
+**"Cannot connect to backend" / status dot stays red**
+- Make sure Docker Desktop is running
+- Make sure you ran `docker-compose up` and saw the `Uvicorn running` message
+- Check that nothing else is using port 8000
+
+**No captions appear even though status is green**
+- Check that the tab is actually playing audio (not muted)
+- Try stopping and restarting captions
+- Make sure your OpenAI API key is correct and has credits
+
+**`docker-compose` command not found**
+- Make sure Docker Desktop finished installing and you restarted your terminal after installation
+
+**Extension not showing up after Load unpacked**
+- Make sure you selected the root folder of the repository (the one that contains `manifest.json`), not a subfolder
+
+---
+
+## How it works
+
+The extension captures tab audio via Chrome's `tabCapture` API, extracts 16 kHz PCM audio frames using an `AudioWorkletNode`, and streams them over a WebSocket to the local FastAPI backend. The backend sends chunks to OpenAI Whisper and streams transcripts back to the extension, which displays them in a Shadow DOM overlay injected into the page.
 
 ## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Extension platform | Chrome Extension Manifest V3 |
+| Extension | Chrome Manifest V3 |
 | Audio capture | `chrome.tabCapture` + Web Audio API |
-| PCM extraction | `AudioWorkletNode` (16 kHz, Float32) |
 | Transcription | OpenAI Whisper (`whisper-1`) |
-| Caption delivery | Content script + Shadow DOM overlay |
 | Backend | FastAPI + WebSocket |
-| Storage | PostgreSQL + Redis |
-
-## Overlay controls
-
-| Control | Action |
-|---|---|
-| Drag caption box | Reposition (saved to storage) |
-| Drag right/left edge | Resize width (up to full screen) |
-| Pin button (📌) | Keep overlay visible across all tabs |
-| Close button (×) | Stop session and dismiss overlay |
-| `Alt+Shift+C` | Toggle captions from anywhere |
+| Storage | PostgreSQL + Redis (via Docker) |
 
 ## Project structure
 
 ```
-├── background/          # Chrome service worker — WebSocket, session control, keepalive
-├── content/             # Caption overlay injected into pages (Shadow DOM)
-├── offscreen/           # Audio capture & PCM extraction (AudioWorklet)
-├── popup/               # Extension popup UI
-├── backend/             # FastAPI transcription server
-│   ├── providers/       # openai_chunked, local_whisper (stub — v1.5)
-│   ├── endpoints/       # WebSocket route
-│   └── db/              # Postgres schema and queries
+├── background/      # Service worker — WebSocket, session control, keepalive
+├── content/         # Caption overlay injected into pages (Shadow DOM)
+├── offscreen/       # Audio capture & PCM extraction (AudioWorklet)
+├── popup/           # Extension popup UI
+├── backend/         # FastAPI transcription server
 ├── manifest.json
 └── docker-compose.yml
 ```
