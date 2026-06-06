@@ -4,6 +4,9 @@ OpenAI Chunked Whisper provider.
 Accumulates Float32 PCM until a configurable window is full, encodes it to
 WAV in-process (no tmp files, no external libraries), and calls the OpenAI
 audio.transcriptions endpoint (whisper-1 or compatible model).
+
+API calls are fired as background tasks so the next window starts filling
+immediately — API latency no longer adds to the effective caption interval.
 """
 
 import asyncio
@@ -16,8 +19,8 @@ from openai import AsyncOpenAI
 
 from events import TranscriptionProvider, TranscriptEvent
 
-# 5 s × 16 000 samples/s × 4 bytes/sample
-_DEFAULT_WINDOW_BYTES = 5 * 16_000 * 4
+# 2 s × 16 000 samples/s × 4 bytes/sample
+_DEFAULT_WINDOW_BYTES = 2 * 16_000 * 4
 
 
 class OpenAIChunkedTranscriber(TranscriptionProvider):
@@ -29,6 +32,7 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
         self._window_bytes: int = config.get("window_bytes", _DEFAULT_WINDOW_BYTES)
         self._buffer = bytearray()
         self._queue: asyncio.Queue[TranscriptEvent | None] = asyncio.Queue()
+        self._pending: set[asyncio.Task] = set()
         self._stopped = False
 
     async def start(self) -> None:
@@ -38,13 +42,13 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
     async def send_audio(self, chunk: bytes, metadata: dict) -> None:
         self._buffer.extend(chunk)
         if len(self._buffer) >= self._window_bytes:
-            await self._flush()
+            payload = bytes(self._buffer)
+            self._buffer.clear()
+            task = asyncio.create_task(self._call_api(payload))
+            self._pending.add(task)
+            task.add_done_callback(self._pending.discard)
 
-    async def _flush(self) -> None:
-        if not self._buffer:
-            return
-        payload = bytes(self._buffer)
-        self._buffer.clear()
+    async def _call_api(self, payload: bytes) -> None:
         wav = _f32le_to_wav(payload, self._sample_rate)
         try:
             kwargs: dict = {"model": self._model, "file": ("audio.wav", wav, "audio/wav")}
@@ -71,7 +75,11 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
     async def stop(self) -> None:
         self._stopped = True
         if self._buffer:
-            await self._flush()
+            payload = bytes(self._buffer)
+            self._buffer.clear()
+            await self._call_api(payload)
+        if self._pending:
+            await asyncio.gather(*self._pending, return_exceptions=True)
         await self._queue.put(None)
 
 
