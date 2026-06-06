@@ -5,7 +5,7 @@ class UCProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this._buf = [];
-    this._TARGET = 16000; // 1s at 16kHz
+    this._TARGET = 4000; // 250ms at 16kHz
   }
 
   process(inputs) {

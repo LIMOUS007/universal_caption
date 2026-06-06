@@ -1,9 +1,9 @@
 console.log('[UC] offscreen-main: loaded');
 
-let _stream        = null;
-let _audioPlayback = null;
-let _recording     = false;
-let _audioCtx      = null;
+let _stream           = null;
+let _playbackCtx      = null;  // native sample rate → speakers (zero-latency, no HTML5 buffer)
+let _transcriptionCtx = null;  // 16kHz → AudioWorklet → service worker
+let _recording        = false;
 
 // ---------------------------------------------------------------------------
 // Message handler (from service worker)
@@ -12,11 +12,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('[UC] offscreen-main: message', message.action);
 
   if (message.action === 'init-stream') {
-    const streamId = message.streamId;
     // Defer out of the message handler — getUserMedia hangs when called
     // synchronously inside a chrome.runtime.onMessage callback.
     setTimeout(() => {
-      initAudio(streamId)
+      initAudio(message.streamId)
         .then(() => sendResponse({ ok: true }))
         .catch((err) => {
           console.error('[UC] offscreen-main: initAudio error', err);
@@ -24,7 +23,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse({ ok: false, error: err.message });
         });
     }, 0);
-    return true; // keep channel open for async sendResponse
+    return true;
   }
 
   if (message.action === 'stop-stream') {
@@ -34,7 +33,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // ---------------------------------------------------------------------------
-// Audio capture via AudioContext & AudioWorklet
+// Audio capture — dual AudioContext to decouple playback from transcription
 // ---------------------------------------------------------------------------
 function getRMS(float32Array) {
   let sum = 0;
@@ -48,9 +47,6 @@ async function initAudio(streamId) {
   console.log('[UC] offscreen-main: initAudio() streamId =', streamId);
   _setStatus('connecting');
 
-  console.log('[UC] offscreen-main: calling getUserMedia...');
-  
-  // Use Promise.race to catch timeouts if getUserMedia hangs
   _stream = await Promise.race([
     navigator.mediaDevices.getUserMedia({
       audio: {
@@ -62,29 +58,29 @@ async function initAudio(streamId) {
       video: false,
     }),
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('getUserMedia timed out after 10 s')), 10000)
+      setTimeout(() => reject(new Error('getUserMedia timed out after 10s')), 10000)
     ),
   ]);
-  
+
   console.log('[UC] offscreen-main: getUserMedia OK, tracks:', _stream.getAudioTracks().length);
 
-  // 1. Play the captured stream back so the user can still hear the tab audio natively
-  _audioPlayback = new Audio();
-  _audioPlayback.srcObject = _stream;
-  _audioPlayback.play();
+  // PATH A — Playback at native hardware rate, direct to speakers.
+  // AudioContext.destination bypasses the HTML5 media buffer that caused the
+  // 5-second startup gap and A/V drift.
+  _playbackCtx = new AudioContext();
+  const playbackSource = _playbackCtx.createMediaStreamSource(_stream);
+  playbackSource.connect(_playbackCtx.destination);
 
-  // 2. Create an AudioContext locked to 16,000 Hz (Whisper's required sample rate)
-  _audioCtx = new AudioContext({ sampleRate: 16000 });
-  
-  // 3. Load the Worklet processor (must be in the same folder as this script)
-  await _audioCtx.audioWorklet.addModule('audio-processor.js');
+  // PATH B — Separate context locked to 16kHz for Whisper. Not connected to
+  // destination so the downsampled audio never reaches the speakers.
+  _transcriptionCtx = new AudioContext({ sampleRate: 16000 });
+  await _transcriptionCtx.audioWorklet.addModule('audio-processor.js');
 
-  const source = _audioCtx.createMediaStreamSource(_stream);
-  const processor = new AudioWorkletNode(_audioCtx, 'uc-processor');
+  const transSource = _transcriptionCtx.createMediaStreamSource(_stream);
+  const processor   = new AudioWorkletNode(_transcriptionCtx, 'uc-processor');
 
   _recording = true;
 
-  // 4. When the processor spits out raw Float32 audio, send it to the Service Worker
   processor.port.onmessage = (event) => {
     if (!_recording) return;
 
@@ -107,13 +103,11 @@ async function initAudio(streamId) {
     }).catch(() => {});
   };
 
-  // Connect source -> processor. 
-  // We DO NOT connect the processor to _audioCtx.destination because 
-  // _audioPlayback is already handling the sound output.
-  source.connect(processor);
+  transSource.connect(processor);
+  // Do NOT connect processor to _transcriptionCtx.destination
 
   _setStatus('connected');
-  console.log('[UC] offscreen-main: Audio pipeline established and streaming.');
+  console.log('[UC] offscreen-main: dual-context audio pipeline established.');
 }
 
 // ---------------------------------------------------------------------------
@@ -123,26 +117,21 @@ function stopAudio() {
   console.log('[UC] offscreen-main: stopAudio()');
 
   _recording = false;
-  
-  // Stop the media stream tracks
+
   if (_stream) {
     _stream.getTracks().forEach((t) => t.stop());
   }
-  
-  // Stop playback
-  if (_audioPlayback) {
-    _audioPlayback.pause();
-    _audioPlayback.srcObject = null;
+
+  if (_playbackCtx && _playbackCtx.state !== 'closed') {
+    _playbackCtx.close().catch(() => {});
+  }
+  if (_transcriptionCtx && _transcriptionCtx.state !== 'closed') {
+    _transcriptionCtx.close().catch(() => {});
   }
 
-  // Gracefully close the AudioContext
-  if (_audioCtx && _audioCtx.state !== 'closed') {
-    _audioCtx.close().catch(() => {});
-  }
-
-  _stream        = null;
-  _audioPlayback = null;
-  _audioCtx      = null;
+  _stream           = null;
+  _playbackCtx      = null;
+  _transcriptionCtx = null;
 
   _setStatus('disconnected');
   console.log('[UC] offscreen-main: audio pipeline torn down');
