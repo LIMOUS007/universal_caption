@@ -296,14 +296,6 @@ class TestSessionManager:
 class TestCreateProviderFactory:
     """Unit tests for the provider factory function."""
 
-    def test_returns_openai_realtime_transcriber(self):
-        """create_provider(openai_realtime) returns an OpenAIRealtimeTranscriber."""
-        from providers.factory import create_provider
-        from providers.openai_realtime import OpenAIRealtimeTranscriber
-
-        provider = create_provider("openai_realtime", {"api_key": "sk-test"})
-        assert isinstance(provider, OpenAIRealtimeTranscriber)
-
     def test_returns_openai_chunked_transcriber(self):
         """create_provider(openai_chunked) returns an OpenAIChunkedTranscriber."""
         from providers.factory import create_provider
@@ -342,7 +334,6 @@ class TestCreateProviderFactory:
             create_provider("mystery_provider", {})
 
         msg = str(exc_info.value)
-        assert "openai_realtime" in msg
         assert "openai_chunked" in msg
         assert "local_whisper" in msg
 

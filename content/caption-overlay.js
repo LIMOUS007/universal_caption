@@ -1,4 +1,4 @@
-console.log('[UC] caption-overlay: loaded on', location.href);
+if (!window.__ucOverlayLoaded) { window.__ucOverlayLoaded = true; console.log('[UC] caption-overlay: loaded on', location.href);
 
 // ---------------------------------------------------------------------------
 // State
@@ -385,3 +385,4 @@ function _setupInteraction() {
     _savePosition();
   });
 }
+} // end __ucOverlayLoaded guard

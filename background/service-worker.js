@@ -75,14 +75,16 @@ async function handleStart(tabId, config) {
     chrome.storage.local.set({ wsStatus: 'connected' });
 
     // Handshake: match the exact payload the python backend expects
-    _ws.send(JSON.stringify({
+    const sessionMsg = {
       type:        'session_start',
       provider:    config.provider || 'openai_chunked',
       api_key:     config.apiKey || '',
       model:       config.model || 'whisper-1',
       sample_rate: 16000,
       encoding:    'pcm_f32le',
-    }));
+    };
+    if (config.language) sessionMsg.language = config.language;
+    _ws.send(JSON.stringify(sessionMsg));
   };
 
   _ws.onmessage = (event) => {

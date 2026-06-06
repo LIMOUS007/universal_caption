@@ -53,9 +53,6 @@ class SessionManager:
             return None
         return {k.decode(): v.decode() for k, v in raw.items()}
 
-    async def set_status(self, session_id: str, status: str) -> None:
-        await self._r.hset(self._key(session_id), "status", status)
-
     async def close(self, session_id: str) -> None:
         await self._r.hset(self._key(session_id), "status", "closed")
         # Let the TTL clean the key naturally; don't delete immediately so

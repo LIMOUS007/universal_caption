@@ -77,17 +77,18 @@ chrome.storage.local.get(
 
     // Show preview overlay on active tab (if not already capturing)
     if (!isCapturing) {
-      chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, async ([tab]) => {
         if (!tab) return;
         _activeTabId = tab.id;
-        chrome.tabs.sendMessage(tab.id, {
-          action: 'show-preview',
-          config: {
-            fontSize:    fs,
-            bgOpacity:   bgo / 100,
-            textOpacity: txo / 100,
-          },
-        }).catch(() => {});
+        const previewConfig = { fontSize: fs, bgOpacity: bgo / 100, textOpacity: txo / 100 };
+        const sent = await chrome.tabs.sendMessage(tab.id, { action: 'show-preview', config: previewConfig }).catch(() => null);
+        if (!sent) {
+          // Content script not injected yet (page was open before extension loaded) — inject it
+          try {
+            await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content/caption-overlay.js'] });
+            chrome.tabs.sendMessage(tab.id, { action: 'show-preview', config: previewConfig }).catch(() => {});
+          } catch (_) {}
+        }
         // Port disconnect fires in the content script when popup closes —
         // more reliable than storage.set in the unload handler.
         try { chrome.tabs.connect(tab.id, { name: 'preview-lifecycle' }); } catch (_) {}
