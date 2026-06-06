@@ -89,6 +89,8 @@ async function initAudio(streamId) {
     if (!_recording) return;
 
     const float32Array = event.data;
+    const t1 = Date.now();
+    console.log(`[UC LAT] T1 chunk_ready samples=${float32Array.length} t=${t1}`);
 
     const rms = getRMS(float32Array);
     if (rms < 0.01) {
@@ -96,9 +98,12 @@ async function initAudio(streamId) {
       return;
     }
 
+    const t2 = Date.now();
+    console.log(`[UC LAT] T2 sending_to_sw t=${t2} (+${t2 - t1}ms since T1)`);
     chrome.runtime.sendMessage({
-      action: 'audio-stream-data',
-      audioData: Array.from(float32Array)
+      action:    'audio-stream-data',
+      audioData: Array.from(float32Array),
+      _t2:       t2,
     }).catch(() => {});
   };
 

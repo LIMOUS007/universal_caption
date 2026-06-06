@@ -89,7 +89,11 @@ async function handleStart(tabId, config) {
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'transcript_delta' || data.type === 'transcript') {
-        if (data.text) deliverCaptionToTab(data.text);
+        if (data.text) {
+          const t4 = Date.now();
+          console.log(`[UC LAT] T4 transcript_received t=${t4} text="${data.text.slice(0, 40)}"`);
+          deliverCaptionToTab(data.text);
+        }
       } else if (data.type === 'error') {
         console.error('[UC] Backend returned error:', data.message);
       }
@@ -156,6 +160,7 @@ async function handleStop() {
     captioningTabTitle: null,
     capturing:          false,
     overlayPinned:      false,
+    overlayPosition:    null,
   });
   console.log('[UC] service-worker: offscreen document closed');
 }
@@ -217,11 +222,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'audio-stream-data':
-      // The offscreen document passes standard arrays across the message boundary.
-      // We convert it back to a Float32Array and send the raw binary buffer directly
-      // into the FastAPI websocket connection.
       if (_ws && _ws.readyState === WebSocket.OPEN) {
         const float32Array = new Float32Array(message.audioData);
+        const t3 = Date.now();
+        console.log(`[UC LAT] T3 sw_received_and_forwarding t=${t3} (+${t3 - (message._t2 || t3)}ms since T2)`);
         _ws.send(float32Array.buffer);
       }
       break;

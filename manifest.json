@@ -31,10 +31,5 @@
     }
   ],
 
-  "web_accessible_resources": [
-    {
-      "resources": ["pip/pip-window.html"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "web_accessible_resources": []
 }
