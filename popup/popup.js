@@ -149,8 +149,9 @@ startBtn.addEventListener('click', async () => {
     provider:   providerEl.value,
     apiKey:     apiKeyEl.value,
     backendUrl: backendEl.value,
-    model:      'whisper-1',
+    model:      providerEl.value === 'openai_chunked' ? 'whisper-1' : 'gpt-4o-transcribe',
   };
+  
 
   console.log('[UC] popup: sending start with config', { ...config, apiKey: '***' });
   chrome.runtime.sendMessage({ action: 'start', tabId: tab.id, config }, (response) => {
