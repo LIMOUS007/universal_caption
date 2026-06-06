@@ -1,6 +1,6 @@
 # Universal Captions — Backend
 
-FastAPI WebSocket server that receives raw PCM audio from the Chrome extension and returns transcripts via OpenAI Whisper (chunked) or the OpenAI Realtime API.
+FastAPI WebSocket server that receives raw PCM audio from the Chrome extension and returns transcripts via OpenAI Whisper.
 
 ## Prerequisites
 
@@ -10,9 +10,8 @@ FastAPI WebSocket server that receives raw PCM audio from the Chrome extension a
 ## Quick Start (Docker)
 
 ```bash
-# 1. Copy and fill in the env file
+# 1. Copy the env file (no changes needed — API key is entered in the popup)
 cp .env.example .env
-# Edit .env — set OPENAI_API_KEY (or leave blank and enter it in the extension popup)
 
 # 2. Start Postgres, Redis, and the API server
 docker-compose up --build
@@ -49,8 +48,8 @@ Copy `.env.example` to `.env` and set values before starting.
 
 1. Load the extension in Chrome (`chrome://extensions` → Load unpacked → select repo root).
 2. Click the Universal Captions toolbar icon.
-3. Set **Backend URL** to `ws://localhost:8000`.
-4. Paste your **OpenAI API key**.
+3. Paste your **OpenAI API key**.
+4. Backend URL defaults to `ws://localhost:8000` — change it under **Advanced** only if needed.
 5. Click **Start Captions** on any tab with audio.
 
 ## WebSocket Protocol
@@ -62,9 +61,8 @@ Client → Server:
   3. TEXT   {"type":"session_end"}
 
 Server → Client:
-  1. {"type":"transcript","text":"..."}               — complete phrase (chunked provider)
-  2. {"type":"transcript_delta","text":"..."}         — incremental word (realtime provider)
-  3. {"type":"error","message":"..."}
+  1. {"type":"transcript","text":"..."}   — complete phrase
+  2. {"type":"error","message":"..."}
 ```
 
 ## Providers

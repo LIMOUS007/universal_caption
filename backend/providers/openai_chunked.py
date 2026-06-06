@@ -19,8 +19,8 @@ from openai import AsyncOpenAI
 
 from events import TranscriptionProvider, TranscriptEvent
 
-# 1 s × 16 000 samples/s × 4 bytes/sample
-_DEFAULT_WINDOW_BYTES = 1 * 16_000 * 4
+# 1.5 s × 16 000 samples/s × 4 bytes/sample
+_DEFAULT_WINDOW_BYTES = int(1.5 * 16_000 * 4)
 
 
 class OpenAIChunkedTranscriber(TranscriptionProvider):
@@ -73,6 +73,8 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
             yield event
 
     async def stop(self) -> None:
+        if self._stopped:
+            return
         self._stopped = True
         if self._buffer:
             payload = bytes(self._buffer)

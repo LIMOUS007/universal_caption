@@ -9,19 +9,31 @@
 
     body {
       font-family: system-ui, sans-serif;
-      width: 260px;
-      padding: 14px;
+      width: 280px;
+      padding: 0;
       margin: 0;
       color: #222;
+      background: #fff;
     }
 
-    h1 {
+    /* ---- header ---- */
+    #header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    #header h1 {
       font-size: 13px;
       font-weight: 700;
-      margin: 0 0 12px;
+      margin: 0;
       color: #1a73e8;
       letter-spacing: 0.03em;
       text-transform: uppercase;
+    }
+
+    /* ---- body ---- */
+    #body {
+      padding: 12px 14px 6px;
     }
 
     .field {
@@ -38,7 +50,7 @@
       letter-spacing: 0.04em;
     }
 
-    select, input[type="password"], input[type="url"] {
+    select, input[type="password"], input[type="url"], input[type="text"] {
       width: 100%;
       padding: 6px 8px;
       font-size: 12px;
@@ -54,11 +66,72 @@
       background: #fff;
     }
 
+    /* API key row with show/hide toggle */
+    .input-row {
+      position: relative;
+    }
+    .input-row input {
+      padding-right: 30px;
+    }
+    #toggle-key {
+      position: absolute;
+      right: 7px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      color: #999;
+      font-size: 13px;
+      line-height: 1;
+    }
+    #toggle-key:hover { color: #555; }
+
     /* Lock config fields while capturing */
     .field.locked select,
-    .field.locked input {
-      opacity: 0.5;
+    .field.locked input,
+    .field.locked .input-row {
+      opacity: 0.45;
       pointer-events: none;
+    }
+
+    /* ---- advanced toggle ---- */
+    #advanced-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0 0 6px;
+      margin-top: 2px;
+    }
+    #advanced-toggle:hover { color: #555; }
+    #advanced-section { display: none; }
+    #advanced-section.open { display: block; }
+
+    /* ---- section label ---- */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 10px 0 7px;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 3px 0 0;
+      accent-color: #1a73e8;
     }
 
     /* ---- status bar ---- */
@@ -66,12 +139,13 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      margin: 10px 0 4px;
+      margin: 10px 0 0;
       padding: 5px 8px;
       background: #f5f5f5;
       border-radius: 5px;
       font-size: 11px;
       color: #555;
+      min-width: 0;
     }
 
     #status-dot {
@@ -82,10 +156,11 @@
       background: #bbb;
       transition: background 0.2s;
     }
-
     #status-dot.connecting { background: #f9a825; }
     #status-dot.connected  { background: #34a853; }
     #status-dot.error      { background: #d93025; }
+
+    #status-text { flex-shrink: 0; }
 
     #caption-source {
       color: #888;
@@ -93,22 +168,34 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      min-width: 0;
     }
 
-    /* ---- switch notice ---- */
+    /* ---- notices ---- */
+    #error-notice {
+      display: none;
+      font-size: 11px;
+      color: #d93025;
+      padding: 4px 2px 0;
+      word-break: break-word;
+    }
+
     #switch-notice {
       display: none;
       font-size: 11px;
       color: #1a73e8;
-      padding: 3px 8px 6px;
-      text-align: center;
+      padding: 4px 2px 0;
     }
 
-    /* ---- buttons ---- */
+    /* ---- footer (buttons + hint) ---- */
+    #footer {
+      padding: 8px 14px 10px;
+      border-top: 1px solid #eee;
+    }
+
     #btn-row {
       display: flex;
       gap: 6px;
-      margin-top: 4px;
     }
 
     #btn-row button {
@@ -122,90 +209,112 @@
       transition: background 0.15s, opacity 0.15s;
     }
 
-    #start-btn {
-      background: #1a73e8;
-      color: #fff;
-    }
-
-    #stop-btn {
-      background: #d93025;
-      color: #fff;
-    }
+    #start-btn { background: #1a73e8; color: #fff; }
+    #stop-btn  { background: #d93025; color: #fff; }
 
     #btn-row button:hover:not(:disabled) { opacity: 0.88; }
+    #btn-row button:disabled { opacity: 0.4; cursor: default; }
 
-    #btn-row button:disabled {
-      opacity: 0.4;
-      cursor: default;
-    }
-
-    .section-label {
+    #shortcut-hint {
+      margin-top: 7px;
       font-size: 10px;
-      font-weight: 700;
-      color: #999;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin: 12px 0 6px;
-      border-top: 1px solid #eee;
-      padding-top: 10px;
+      color: #bbb;
+      text-align: center;
     }
-
-    input[type="range"] {
-      width: 100%;
-      margin: 3px 0 0;
-      accent-color: #1a73e8;
+    #shortcut-hint kbd {
+      font-family: inherit;
+      font-size: 10px;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      padding: 1px 4px;
+      color: #777;
     }
-
   </style>
 </head>
 <body>
-  <h1>Universal Captions</h1>
-
-  <div class="field" id="field-provider">
-    <label for="provider">Provider</label>
-    <select id="provider">
-      <option value="openai_chunked">OpenAI Whisper</option>
-    </select>
+  <div id="header">
+    <h1>Universal Captions</h1>
   </div>
 
-  <div class="field" id="field-api-key">
-    <label for="api-key">API Key</label>
-    <input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+  <!-- provider hidden — only one option, kept for JS compatibility -->
+  <select id="provider" style="display:none">
+    <option value="openai_chunked">OpenAI Whisper</option>
+  </select>
+
+  <div id="body">
+    <div class="field" id="field-api-key">
+      <label for="api-key">OpenAI API Key</label>
+      <div class="input-row">
+        <input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+        <button id="toggle-key" title="Show/hide key">👁</button>
+      </div>
+    </div>
+
+    <div class="field" id="field-language">
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="">Auto-detect</option>
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="pt">Portuguese</option>
+        <option value="it">Italian</option>
+        <option value="ja">Japanese</option>
+        <option value="zh">Chinese</option>
+        <option value="ko">Korean</option>
+        <option value="ar">Arabic</option>
+        <option value="ru">Russian</option>
+        <option value="tr">Turkish</option>
+        <option value="pl">Polish</option>
+        <option value="nl">Dutch</option>
+        <option value="sv">Swedish</option>
+      </select>
+    </div>
+
+    <button id="advanced-toggle">Advanced ▾</button>
+    <div id="advanced-section">
+      <div class="field" id="field-backend-url">
+        <label for="backend-url">Backend URL</label>
+        <input type="url" id="backend-url" value="ws://localhost:8000" />
+      </div>
+    </div>
+
+    <div class="section-label">Overlay</div>
+
+    <div class="field">
+      <label for="font-size">Font Size — <span id="font-size-val">18</span>px</label>
+      <input type="range" id="font-size" min="0" max="500" value="18" />
+    </div>
+
+    <div class="field">
+      <label for="bg-opacity">Box Opacity — <span id="bg-opacity-val">78</span>%</label>
+      <input type="range" id="bg-opacity" min="0" max="100" value="78" />
+    </div>
+
+    <div class="field">
+      <label for="text-opacity">Text Opacity — <span id="text-opacity-val">100</span>%</label>
+      <input type="range" id="text-opacity" min="0" max="100" value="100" />
+    </div>
+
+    <div id="status-bar">
+      <span id="status-dot"></span>
+      <span id="status-text">Not connected</span>
+      <span id="caption-source"></span>
+    </div>
+
+    <div id="error-notice"></div>
+    <div id="switch-notice">Switched caption source to this tab</div>
   </div>
 
-  <div class="field" id="field-backend-url">
-    <label for="backend-url">Backend URL</label>
-    <input type="url" id="backend-url" value="ws://localhost:8000" />
-  </div>
-
-  <div class="section-label">Overlay</div>
-
-  <div class="field">
-    <label for="font-size">Font Size — <span id="font-size-val">18</span>px</label>
-    <input type="range" id="font-size" min="12" max="32" value="18" />
-  </div>
-
-  <div class="field">
-    <label for="bg-opacity">Box Opacity — <span id="bg-opacity-val">72</span>%</label>
-    <input type="range" id="bg-opacity" min="0" max="100" value="72" />
-  </div>
-
-  <div class="field">
-    <label for="text-opacity">Text Opacity — <span id="text-opacity-val">100</span>%</label>
-    <input type="range" id="text-opacity" min="0" max="100" value="100" />
-  </div>
-
-  <div id="status-bar">
-    <span id="status-dot"></span>
-    <span id="status-text">Not connected</span>
-    <span id="caption-source"></span>
-  </div>
-
-  <div id="switch-notice">Switched caption source to this tab</div>
-
-  <div id="btn-row">
-    <button id="start-btn">Start Captions</button>
-    <button id="stop-btn" disabled>Stop Captions</button>
+  <div id="footer">
+    <div id="btn-row">
+      <button id="start-btn">Start Captions</button>
+      <button id="stop-btn" disabled>Stop Captions</button>
+    </div>
+    <div id="shortcut-hint"><kbd>Alt+Shift+C</kbd> to toggle from anywhere</div>
   </div>
 
   <script src="popup.js"></script>

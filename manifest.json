@@ -10,8 +10,19 @@
     "activeTab",
     "scripting",
     "storage",
-    "alarms"
+    "alarms",
+    "commands"
   ],
+
+  "commands": {
+    "toggle-captions": {
+      "suggested_key": {
+        "default": "Alt+Shift+C",
+        "mac":     "Alt+Shift+C"
+      },
+      "description": "Toggle captions on/off"
+    }
+  },
   "host_permissions": ["<all_urls>"],
 
   "background": {

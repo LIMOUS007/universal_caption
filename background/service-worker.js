@@ -96,6 +96,7 @@ async function handleStart(tabId, config) {
         }
       } else if (data.type === 'error') {
         console.error('[UC] Backend returned error:', data.message);
+        chrome.storage.local.set({ wsStatus: 'error', wsError: data.message || 'Unknown error' });
       }
     } catch (e) {
       console.error('[UC] Failed to parse WS message:', e);
@@ -112,26 +113,34 @@ async function handleStart(tabId, config) {
     chrome.storage.local.set({ wsStatus: 'disconnected' });
   };
 
-  // 2. Spin up the offscreen document to capture audio
-  const streamId = await new Promise((resolve, reject) => {
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(id);
+  // 2. Spin up the offscreen document to capture audio.
+  // If anything here fails the WebSocket is already open — clean it up.
+  try {
+    const streamId = await new Promise((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(id);
+      });
     });
-  });
-  console.log('[UC] service-worker: got streamId', streamId);
+    console.log('[UC] service-worker: got streamId', streamId);
 
-  await ensureOffscreenDocument();
+    await ensureOffscreenDocument();
 
-  const response = await chrome.runtime.sendMessage({
-    action: 'init-stream',
-    streamId,
-    config,
-  });
+    const response = await chrome.runtime.sendMessage({
+      action: 'init-stream',
+      streamId,
+      config,
+    });
 
-  if (!response?.ok) {
-    throw new Error(response?.error ?? 'offscreen init failed');
+    if (!response?.ok) {
+      throw new Error(response?.error ?? 'offscreen init failed');
+    }
+  } catch (err) {
+    await handleStop();
+    throw err;
   }
+
+  await chrome.storage.local.set({ capturing: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +166,7 @@ async function handleStop() {
   await chrome.offscreen.closeDocument().catch(() => {});
   await chrome.storage.local.set({
     wsStatus:           'disconnected',
+    wsError:            null,
     captioningTabTitle: null,
     capturing:          false,
     overlayPinned:      false,
@@ -239,4 +249,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[UC] service-worker: installed/updated');
+});
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcut — Alt+Shift+C toggles captions on the active tab
+// ---------------------------------------------------------------------------
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== 'toggle-captions') return;
+  const data = await chrome.storage.local.get(
+    ['capturing', 'apiKey', 'backendUrl', 'provider', 'language']
+  );
+  if (data.capturing) {
+    await handleStop().catch(console.error);
+  } else {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+    await handleStart(tab.id, {
+      provider:   data.provider   || 'openai_chunked',
+      apiKey:     data.apiKey     || '',
+      backendUrl: data.backendUrl || 'ws://localhost:8000',
+      model:      'whisper-1',
+      language:   data.language   || undefined,
+    }).catch(console.error);
+  }
 });

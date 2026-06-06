@@ -137,7 +137,7 @@ function _ensureOverlay(preview = false) {
   position: fixed;
   z-index: 2147483647;
   min-width: 180px;
-  max-width: 560px;
+  max-width: 98vw;
   border-radius: 10px;
   padding: 10px 48px 10px 14px;
   font-family: system-ui, -apple-system, sans-serif;
@@ -215,7 +215,6 @@ function _ensureOverlay(preview = false) {
   _closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     chrome.runtime.sendMessage({ action: 'stop' }).catch(() => {});
-    chrome.storage.local.set({ capturing: false, overlayPinned: false, wsStatus: 'disconnected' });
     _removeOverlay();
   });
 
@@ -370,8 +369,8 @@ function _setupInteraction() {
     } else if (mode === 'resize') {
       const dx = e.clientX - sx;
       let { left, width } = sr;
-      if (dir === 'e') width = Math.max(150, Math.min(window.innerWidth * 0.9, sr.width + dx));
-      if (dir === 'w') { const nw = Math.max(150, sr.width - dx); left = sr.left + sr.width - nw; width = nw; }
+      if (dir === 'e') width = Math.max(150, Math.min(window.innerWidth - sr.left - 8, sr.width + dx));
+      if (dir === 'w') { const nw = Math.max(150, Math.min(sr.left + sr.width - 8, sr.width - dx)); left = sr.left + sr.width - nw; width = nw; }
       _box.style.left   = `${left}px`;
       _box.style.width  = `${width}px`;
       _box.style.bottom = ''; _box.style.transform = '';

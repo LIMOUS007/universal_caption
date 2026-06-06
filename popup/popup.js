@@ -9,14 +9,28 @@ const statusDot        = document.getElementById('status-dot');
 const statusText       = document.getElementById('status-text');
 const captionSource    = document.getElementById('caption-source');
 const switchNotice     = document.getElementById('switch-notice');
+const errorNotice      = document.getElementById('error-notice');
 const fontSizeEl       = document.getElementById('font-size');
 const fontSizeValEl    = document.getElementById('font-size-val');
 const bgOpacityEl      = document.getElementById('bg-opacity');
 const bgOpacityValEl   = document.getElementById('bg-opacity-val');
 const textOpacityEl    = document.getElementById('text-opacity');
 const textOpacityValEl = document.getElementById('text-opacity-val');
+const languageEl       = document.getElementById('language');
 
-const lockableFields = ['field-provider', 'field-api-key', 'field-backend-url'];
+const lockableFields = ['field-api-key', 'field-backend-url', 'field-language'];
+
+// API key show/hide
+document.getElementById('toggle-key')?.addEventListener('click', () => {
+  apiKeyEl.type = apiKeyEl.type === 'password' ? 'text' : 'password';
+});
+
+// Advanced section toggle
+document.getElementById('advanced-toggle')?.addEventListener('click', function () {
+  const section = document.getElementById('advanced-section');
+  const open = section.classList.toggle('open');
+  this.textContent = open ? 'Advanced ▴' : 'Advanced ▾';
+});
 
 let isCapturing = false;
 let _activeTabId = null;
@@ -25,8 +39,8 @@ let _activeTabId = null;
 // Restore persisted config + state
 // ---------------------------------------------------------------------------
 chrome.storage.local.get(
-  ['capturing', 'wsStatus', 'provider', 'apiKey', 'groqApiKey', 'backendUrl', 'overlayConfig',
-   'captioningTabTitle', 'statusMessage'],
+  ['capturing', 'wsStatus', 'wsError', 'provider', 'apiKey', 'groqApiKey', 'backendUrl',
+   'language', 'overlayConfig', 'captioningTabTitle', 'statusMessage'],
   (data) => {
     console.log('[UC] popup: restored storage', data);
     isCapturing      = !!data.capturing;
@@ -37,9 +51,11 @@ chrome.storage.local.get(
       chrome.storage.local.set({ apiKey: resolvedApiKey });
       chrome.storage.local.remove('groqApiKey');
     }
-    apiKeyEl.value  = resolvedApiKey;
-    backendEl.value = data.backendUrl || 'ws://localhost:8000';
+    apiKeyEl.value   = resolvedApiKey;
+    backendEl.value  = data.backendUrl || 'ws://localhost:8000';
+    languageEl.value = data.language   || '';
     updateStatus(data.wsStatus || 'disconnected');
+    updateErrorNotice(data.wsError || null);
     updateTabTitle(data.captioningTabTitle || null);
     syncButtons();
 
@@ -93,6 +109,9 @@ apiKeyEl.addEventListener('input', () =>
 backendEl.addEventListener('input', () =>
   chrome.storage.local.set({ backendUrl: backendEl.value }),
 );
+languageEl.addEventListener('change', () =>
+  chrome.storage.local.set({ language: languageEl.value }),
+);
 
 // ---------------------------------------------------------------------------
 // Listen for status + tab title changes from service worker
@@ -100,6 +119,7 @@ backendEl.addEventListener('input', () =>
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   if (changes.wsStatus)           updateStatus(changes.wsStatus.newValue);
+  if ('wsError' in changes)       updateErrorNotice(changes.wsError.newValue || null);
   if (changes.captioningTabTitle) updateTabTitle(changes.captioningTabTitle.newValue);
   if (changes.statusMessage?.newValue) {
     showSwitchNotice();
@@ -150,6 +170,7 @@ startBtn.addEventListener('click', async () => {
     apiKey:     apiKeyEl.value,
     backendUrl: backendEl.value,
     model:      'whisper-1',
+    language:   languageEl.value || undefined,
   };
 
 
@@ -211,6 +232,11 @@ function updateStatus(status) {
 
 function updateTabTitle(title) {
   captionSource.textContent = title ? ` — ${title}` : '';
+}
+
+function updateErrorNotice(msg) {
+  errorNotice.textContent     = msg || '';
+  errorNotice.style.display   = msg ? 'block' : 'none';
 }
 
 let switchNoticeTimer = null;
