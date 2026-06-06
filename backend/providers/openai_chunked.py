@@ -19,8 +19,8 @@ from openai import AsyncOpenAI
 
 from events import TranscriptionProvider, TranscriptEvent
 
-# 2 s × 16 000 samples/s × 4 bytes/sample
-_DEFAULT_WINDOW_BYTES = 2 * 16_000 * 4
+# 1 s × 16 000 samples/s × 4 bytes/sample
+_DEFAULT_WINDOW_BYTES = 1 * 16_000 * 4
 
 
 class OpenAIChunkedTranscriber(TranscriptionProvider):
