@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Universal Captions",
-  "version": "0.1.0",
-  "description": "Live captioning overlay for any tab.",
+  "version": "1.0.0",
+  "description": "Real-time speech-to-text captions overlaid on any Chrome tab.",
 
   "permissions": [
     "tabCapture",
