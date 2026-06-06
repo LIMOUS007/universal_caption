@@ -196,9 +196,22 @@ stopBtn.addEventListener('click', async () => {
   chrome.runtime.sendMessage({ action: 'stop' }, (response) => {
     console.log('[UC] popup: stop response', response);
     isCapturing = false;
-    // capturing: false triggers all content scripts to remove overlay
     chrome.storage.local.set({ capturing: false });
     syncButtons();
+
+    // Re-show preview so the user can start again from the same popup
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      if (!tab) return;
+      _activeTabId = tab.id;
+      const config = {
+        fontSize:    Number(fontSizeEl.value),
+        bgOpacity:   Number(bgOpacityEl.value) / 100,
+        textOpacity: Number(textOpacityEl.value) / 100,
+      };
+      chrome.tabs.sendMessage(tab.id, { action: 'show-preview', config }).catch(() => {});
+      try { chrome.tabs.connect(tab.id, { name: 'preview-lifecycle' }); } catch (_) {}
+      chrome.storage.local.set({ previewActive: true });
+    });
   });
 });
 
