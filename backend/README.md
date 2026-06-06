@@ -50,7 +50,7 @@ Copy `.env.example` to `.env` and set values before starting.
 1. Load the extension in Chrome (`chrome://extensions` → Load unpacked → select repo root).
 2. Click the Universal Captions toolbar icon.
 3. Set **Backend URL** to `ws://localhost:8000`.
-4. Select a **Provider** and paste your **OpenAI API key**.
+4. Paste your **OpenAI API key**.
 5. Click **Start Captions** on any tab with audio.
 
 ## WebSocket Protocol
@@ -71,8 +71,7 @@ Server → Client:
 
 | Value | Model | Description |
 |---|---|---|
-| `openai_chunked` | `whisper-1` | Buffers ~1s of Float32 PCM, converts to WAV in-memory, sends to `POST /v1/audio/transcriptions`. Reliable, slight latency. |
-| `openai_realtime` | `gpt-4o-transcribe` | Streams Float32→Int16 PCM to OpenAI Realtime API with server-side VAD. Lower latency, higher cost. |
+| `openai_chunked` | `whisper-1` | Buffers ~1s of Float32 PCM, converts to WAV in-memory, sends to `POST /v1/audio/transcriptions`. |
 | `local_whisper` | *(stub)* | Intended for faster-whisper on CPU/GPU. Not yet implemented. |
 
 ## Running Tests

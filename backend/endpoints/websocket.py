@@ -11,8 +11,7 @@ Client → Server:
 
 Server → Client:
   1. {"type":"session_started","session_id":"<uuid>"}
-  2. {"type":"transcript_delta","text":"...","is_final":false}  (Realtime only)
-  3. {"type":"transcript","text":"...","is_final":true}
+  2. {"type":"transcript","text":"...","is_final":true}
   4. {"type":"error","message":"..."}
   5. {"type":"session_ended","session_id":"<uuid>"}
 """

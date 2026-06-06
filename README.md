@@ -14,7 +14,7 @@ The service worker stays alive between chunks using `chrome.alarms`, so long ses
 - **Draggable, resizable overlay** — reposition and resize the caption box; position is saved across sessions
 - **Pin mode** — lock the overlay to stay visible across all tabs simultaneously
 - **Silent-frame filtering** — RMS-based silence detection skips quiet chunks to reduce API overhead
-- **Two transcription providers** — OpenAI Whisper (chunked, lower cost) or OpenAI Realtime API (streaming, lower latency)
+- **OpenAI Whisper transcription** — buffers 1s PCM chunks, sends to Whisper REST API
 - **Single-session enforcement** — switching to a new tab automatically stops the previous session with a brief on-screen notice
 - **Overlay appearance controls** — font size, background opacity, and text opacity adjustable from the popup
 
@@ -46,8 +46,7 @@ The API will be available at `http://localhost:8000`. See [backend/README.md](ba
 ### 3. Configure the popup
 
 1. Click the Universal Captions toolbar icon.
-2. Select a **Provider** (`OpenAI Whisper` or `OpenAI Realtime`).
-3. Paste your [OpenAI API key](https://platform.openai.com/api-keys) into the **API Key** field.
+2. Paste your [OpenAI API key](https://platform.openai.com/api-keys) into the **API Key** field.
 4. Set **Backend URL** to `ws://localhost:8000` (default).
 5. Adjust font size and opacity if desired.
 
@@ -64,7 +63,7 @@ The API will be available at `http://localhost:8000`. See [backend/README.md](ba
 | Extension platform | Chrome Extension Manifest V3 |
 | Audio capture | `chrome.tabCapture` + Web Audio API |
 | PCM extraction | `AudioWorkletNode` (16 kHz, Float32) |
-| Transcription | OpenAI Whisper (`whisper-1`) / OpenAI Realtime (`gpt-4o-transcribe`) |
+| Transcription | OpenAI Whisper (`whisper-1`) |
 | Caption delivery | Content script + Shadow DOM overlay |
 | Backend | FastAPI + WebSocket |
 | Storage | PostgreSQL + Redis |
@@ -78,12 +77,11 @@ The API will be available at `http://localhost:8000`. See [backend/README.md](ba
 | Pin button (📌) | Keep overlay visible across all tabs |
 | Close button (×) | Stop session and dismiss overlay |
 
-## Providers
+## Provider
 
 | Value | Model | Notes |
 |---|---|---|
-| `openai_chunked` | `whisper-1` | Buffers 1s of PCM, sends to Whisper REST API. Reliable, slight latency. Default. |
-| `openai_realtime` | `gpt-4o-transcribe` | Streams PCM to OpenAI Realtime API. Lower latency, higher cost. |
+| `openai_chunked` | `whisper-1` | Buffers 1s of PCM, sends to Whisper REST API. |
 
 ## Project structure
 

@@ -35,7 +35,6 @@ Load unpacked from repo root at `chrome://extensions`. Reload after any JS/HTML 
 | ID | Model | Notes |
 |---|---|---|
 | `openai_chunked` | `whisper-1` | default; 1s chunks; reliable |
-| `openai_realtime` | `gpt-4o-transcribe` | streaming; lower latency; higher cost |
 | `local_whisper` | faster-whisper | stub only — not implemented |
 
 ## Chrome storage keys (runtime state)

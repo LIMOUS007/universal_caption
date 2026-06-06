@@ -1,12 +1,10 @@
 from events import TranscriptionProvider
-from providers.openai_realtime import OpenAIRealtimeTranscriber
 from providers.openai_chunked import OpenAIChunkedTranscriber
 from providers.local_whisper import LocalWhisperTranscriber
 
 _REGISTRY: dict[str, type[TranscriptionProvider]] = {
-    "openai_realtime": OpenAIRealtimeTranscriber,
-    "openai_chunked":  OpenAIChunkedTranscriber,
-    "local_whisper":   LocalWhisperTranscriber,
+    "openai_chunked": OpenAIChunkedTranscriber,
+    "local_whisper":  LocalWhisperTranscriber,
 }
 
 
