@@ -180,8 +180,9 @@ async function handleStop() {
 // ---------------------------------------------------------------------------
 // Delivery helper
 // ---------------------------------------------------------------------------
-async function deliverCaptionToTab(text) {
+async function deliverCaptionToTab(rawText) {
   if (!_activeTabId) return;
+  const text = rawText.toLowerCase().replace(/[.,?!;:]/g, '');
 
   if (_isPinned) {
     // Broadcast to all normal tabs; content script ignores if it has no overlay.
