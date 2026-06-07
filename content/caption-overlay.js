@@ -197,7 +197,7 @@ function _ensureOverlay(preview = false) {
   _pinBtn    = shadow.getElementById('pin-btn');
   _closeBtn  = shadow.getElementById('close-btn');
 
-  document.body.appendChild(_root);
+  _getOverlayParent().appendChild(_root);
   _applyConfig();
   _applyPosition();
   _updatePinBtn();
@@ -225,6 +225,14 @@ function _ensureOverlay(preview = false) {
     _updatePinBtn();
   });
 }
+
+function _getOverlayParent() {
+  return document.fullscreenElement || document.body;
+}
+
+document.addEventListener('fullscreenchange', () => {
+  if (_root) _getOverlayParent().appendChild(_root);
+});
 
 function _removeOverlay() {
   clearTimeout(_captionTimer);
