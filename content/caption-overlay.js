@@ -344,14 +344,16 @@ function _setupInteraction() {
     if (path.some(el => el.id === 'controls' || el.id === 'pin-btn' || el.id === 'close-btn')) {
       _box.style.cursor = 'default'; return;
     }
+    if (_isPinned) { _box.style.cursor = 'default'; return; }
     const d = _getResizeDir(e.clientX, e.clientY);
     _box.style.cursor = d ? `${d}-resize` : 'grab';
   });
-  _box.addEventListener('mouseleave', () => { if (!mode) _box.style.cursor = 'grab'; });
+  _box.addEventListener('mouseleave', () => { if (!mode) _box.style.cursor = _isPinned ? 'default' : 'grab'; });
 
   _box.addEventListener('mousedown', (e) => {
     const path = e.composedPath();
     if (path.some(el => el.id === 'controls' || el.id === 'pin-btn' || el.id === 'close-btn')) return;
+    if (_isPinned) return;
     e.preventDefault();
     const d = _getResizeDir(e.clientX, e.clientY);
     if (d) {
