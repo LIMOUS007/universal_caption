@@ -51,10 +51,13 @@ async def transcribe(ws: WebSocket) -> None:
         sample_rate: int   = int(start_msg.get("sample_rate", 16_000))
         encoding: str      = start_msg.get("encoding", "pcm_f32le")
         provider_config = {
-            "api_key":     start_msg.get("api_key", ""),
-            "model":       start_msg.get("model", "whisper-1"),
-            "sample_rate": sample_rate,
-            "language":    start_msg.get("language"),
+            "api_key":      start_msg.get("api_key", ""),
+            "model":        start_msg.get("model", "whisper-1"),
+            "sample_rate":  sample_rate,
+            "language":     start_msg.get("language"),
+            "model_size":   start_msg.get("model_size", "base"),
+            "device":       start_msg.get("device", "cpu"),
+            "compute_type": start_msg.get("compute_type", "int8"),
         }
 
         session_id = await session_manager.create(
