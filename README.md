@@ -1,157 +1,162 @@
 # Universal Captions
 
-Real-time speech-to-text captions overlaid on any Chrome tab — YouTube, Google Meet, Zoom, podcasts, lectures, anything with audio.
+Live subtitles on any Chrome tab — YouTube, Zoom, podcasts, lectures, anything with audio. Captions float on top of the page so you can read while you watch.
 
 ---
 
-## What you need before starting
+## Before you start — what you'll need
 
-- **A computer running Windows, Mac, or Linux**
-- **Google Chrome** (or any Chromium-based browser like Edge, Brave)
-- **Docker Desktop** — this runs the backend server that does the transcription
-  - [Download Docker Desktop for Windows/Mac](https://www.docker.com/products/docker-desktop/)
-  - Linux: follow the [Docker Engine install guide](https://docs.docker.com/engine/install/)
-- **An OpenAI API key** — used for Whisper transcription
-  - Get one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (requires a free OpenAI account)
+You need **3 things** before following the steps below:
+
+### 1. Google Chrome
+Most people already have this. If not, [download it here](https://www.google.com/chrome/).
+
+### 2. Docker Desktop
+This is a free app that runs the caption server in the background. Think of it like a small engine that does the heavy lifting.
+
+- **Windows or Mac:** [Download Docker Desktop](https://www.docker.com/products/docker-desktop/) → install it like any normal app → open it
+- **Linux:** [Install guide](https://docs.docker.com/engine/install/)
+
+> After installing, always **open Docker Desktop first** before using the extension. It needs to be running in the background.
+
+### 3. A free API key (pick one)
+
+An API key is like a password that gives the app permission to use a transcription service. Pick whichever is easiest:
+
+| Service | Cost | How to get the key |
+|---|---|---|
+| **Groq** (recommended for beginners) | Free | Go to [console.groq.com/keys](https://console.groq.com/keys) → sign up → click "Create API Key" → copy it |
+| **Deepgram** | Free $200 credit | Go to [console.deepgram.com](https://console.deepgram.com) → sign up → go to API Keys → create one |
+| **OpenAI** | Pay per use | Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → sign up → create a key |
+
+**Groq is free and fast — start there if you're unsure.**
 
 ---
 
-## Setup — step by step
+## Setup (do this once)
 
-### Step 1 — Download this repository
+### Step 1 — Download this project
 
-**Option A: with Git**
-```bash
+**Option A — with Git** (if you have it):
+```
 git clone https://github.com/LIMOUS007/universal_caption.git
-cd universal_caption
 ```
 
-**Option B: without Git**
-- Click the green **Code** button on this GitHub page → **Download ZIP**
-- Unzip it somewhere easy to find (e.g. your Desktop)
+**Option B — without Git:**
+- Click the green **Code** button at the top of this GitHub page
+- Click **Download ZIP**
+- Unzip the folder somewhere easy to find (like your Desktop)
 
 ---
 
-### Step 2 — Start the backend server
+### Step 2 — Open a terminal in the project folder
 
-The backend handles audio transcription. You need to start it once before using the extension.
+A terminal is a text window where you type commands. Here's how to open one inside the project folder:
 
-**Make sure Docker Desktop is open and running first.**
+**Windows:**
+- Open the unzipped folder in File Explorer
+- Click the address bar at the top (where it shows the folder path)
+- Type `cmd` and press Enter — a black terminal window opens in that folder
 
-Then open a terminal in the repository folder and run:
+**Mac:**
+- Open the folder in Finder
+- Right-click on the folder → **New Terminal at Folder** (or open Terminal from Applications, then drag the folder into it)
 
-**Mac / Linux:**
-```bash
-cp backend/.env.example backend/.env
-docker-compose up --build
+---
+
+### Step 3 — Run the backend server
+
+Make sure **Docker Desktop is open** first. Then, in the terminal you just opened, run these two commands one at a time (copy and paste each line, then press Enter):
+
+**Windows:**
 ```
-
-**Windows (Command Prompt):**
-```cmd
 copy backend\.env.example backend\.env
 docker-compose up --build
 ```
 
-**Windows (PowerShell):**
-```powershell
-Copy-Item backend\.env.example backend\.env
+**Mac / Linux:**
+```
+cp backend/.env.example backend/.env
 docker-compose up --build
 ```
 
-The first run downloads dependencies and may take a few minutes. When you see a line like `Uvicorn running on http://0.0.0.0:8000`, the backend is ready.
+The first time you run this, it will take **2–5 minutes** to download and set things up. That's normal.
 
-> **Every time you want to use the extension**, open Docker Desktop and run `docker-compose up` in the repository folder. You can stop it with `Ctrl+C`.
+When you see a line that says `Uvicorn running on http://0.0.0.0:8000` — you're ready. Leave this window open.
+
+> **Every time you use the extension:** open Docker Desktop, then run `docker-compose up` in the terminal. You can stop it any time with `Ctrl+C`.
 
 ---
 
-### Step 3 — Load the extension in Chrome
+### Step 4 — Load the extension into Chrome
 
-1. Open Chrome and go to `chrome://extensions`
-2. Turn on **Developer mode** using the toggle in the top-right corner
+1. Open Chrome and go to this address: `chrome://extensions`
+2. Turn on **Developer mode** — there's a toggle in the top-right corner of the page
 3. Click **Load unpacked**
-4. Select the repository root folder (the one containing `manifest.json`)
-5. The Universal Captions icon will appear in your Chrome toolbar
+4. Select the folder you downloaded (the one that contains `manifest.json` inside it)
+5. The Universal Captions icon will appear in your Chrome toolbar (top-right)
 
-> If you don't see the icon, click the puzzle-piece icon in the toolbar and pin Universal Captions.
+> Can't see the icon? Click the **puzzle piece** icon in the toolbar and pin Universal Captions.
 
 ---
 
-### Step 4 — Add your API key
+### Step 5 — Add your API key
 
 1. Click the Universal Captions icon in the toolbar
-2. Paste your OpenAI API key into the **API Key** field
-3. Choose a **Language** or leave it on **Auto-detect**
-4. Leave **Backend URL** as `ws://localhost:8000` (only change this if you're running the backend on a different machine)
-
-Your key is only sent to your own local backend — it is never stored or shared.
+2. Click the chip for the service you signed up for — **OpenAI**, **Groq**, or **Deepgram**
+3. Paste your API key into the box
+4. Leave everything else as-is
 
 ---
 
-### Step 5 — Start captions
+### Step 6 — Start captions!
 
-1. Go to any tab that's playing audio (YouTube, a video call, a podcast, etc.)
-2. Click **Start Captions** in the popup, or press `Alt+Shift+C`
-3. The status dot turns **green** when connected
-4. Captions appear as a floating overlay on the page within ~2 seconds
+1. Go to any tab with audio (a YouTube video, a meeting, a podcast)
+2. Click **Start Captions** in the popup
+3. The dot turns **green** = it's working
+4. Captions appear as a floating box on the page within a couple of seconds
 
----
-
-## Overlay controls
-
-| Action | What it does |
-|---|---|
-| Drag the caption box | Move it anywhere on the screen |
-| Drag the left or right edge | Resize the width |
-| Click 📌 (pin) | Keep the overlay visible across all tabs |
-| Click × (close) | Stop captions and dismiss the overlay |
-| `Alt+Shift+C` | Toggle captions without opening the popup |
-
-Font size, background opacity, and text opacity are all adjustable from the popup.
+You can also press **Alt+Shift+C** on your keyboard to turn captions on or off without opening the popup.
 
 ---
 
-## Troubleshooting
+## Using the caption overlay
 
-**"Cannot connect to backend" / status dot stays red**
-- Make sure Docker Desktop is running
-- Make sure you ran `docker-compose up` and saw the `Uvicorn running` message
-- Check that nothing else is using port 8000
+Once captions are on, a box appears on the page. Here's what you can do with it:
 
-**No captions appear even though status is green**
-- Check that the tab is actually playing audio (not muted)
-- Try stopping and restarting captions
-- Make sure your OpenAI API key is correct and has credits
+- **Drag it** anywhere on the screen
+- **Drag the left or right edge** to make it wider or narrower
+- **Click 📌** to pin it — it stays visible even if you switch tabs
+- **Click ✕** to stop captions
+- Adjust font size, background brightness, and text brightness from the popup
+
+---
+
+## Something not working?
+
+**The status dot stays red or shows "Connection error"**
+→ Docker Desktop is probably not running. Open it and make sure the engine is started, then run `docker-compose up` again in the terminal.
+
+**"Enter a key to start captions"**
+→ You need to paste your API key first (Step 5 above).
+
+**Status is green but no captions appear**
+→ Check that the tab's audio isn't muted. Try stopping and starting captions again.
+
+**"401" or "invalid key" error**
+→ The API key was rejected. Double-check you copied the full key without any extra spaces, and that you're using the right provider chip for that key.
 
 **`docker-compose` command not found**
-- Make sure Docker Desktop finished installing and you restarted your terminal after installation
+→ Docker Desktop may not have finished installing. Restart your terminal (close it and open a new one) and try again.
 
-**Extension not showing up after Load unpacked**
-- Make sure you selected the root folder of the repository (the one that contains `manifest.json`), not a subfolder
+**Extension doesn't appear after "Load unpacked"**
+→ Make sure you selected the right folder — it should be the one that has `manifest.json` directly inside it, not a subfolder.
+
+**Alt+Shift+C does nothing**
+→ Make sure you've entered an API key first. The shortcut won't work if no key is configured.
 
 ---
 
-## How it works
+## How it works (optional reading)
 
-The extension captures tab audio via Chrome's `tabCapture` API, extracts 16 kHz PCM audio frames using an `AudioWorkletNode`, and streams them over a WebSocket to the local FastAPI backend. The backend sends chunks to OpenAI Whisper and streams transcripts back to the extension, which displays them in a Shadow DOM overlay injected into the page.
-
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Extension | Chrome Manifest V3 |
-| Audio capture | `chrome.tabCapture` + Web Audio API |
-| Transcription | OpenAI Whisper (`whisper-1`) |
-| Backend | FastAPI + WebSocket |
-| Storage | PostgreSQL + Redis (via Docker) |
-
-## Project structure
-
-```
-├── background/      # Service worker — WebSocket, session control, keepalive
-├── content/         # Caption overlay injected into pages (Shadow DOM)
-├── offscreen/       # Audio capture & PCM extraction (AudioWorklet)
-├── popup/           # Extension popup UI
-├── backend/         # FastAPI transcription server
-├── manifest.json
-└── docker-compose.yml
-```
+The extension captures audio from the tab using Chrome's built-in audio tools. It converts the audio into small chunks and sends them over a local connection to the backend server running on your computer. The server sends those chunks to the transcription service (Groq, Deepgram, or OpenAI), gets back the text, and displays it on the page. Your API key is only used on your own machine — it's never stored on any external server.

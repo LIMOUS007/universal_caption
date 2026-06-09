@@ -1,26 +1,30 @@
 # Universal Captions — Backend
 
-FastAPI WebSocket server that receives raw PCM audio from the Chrome extension and returns transcripts via OpenAI Whisper.
+FastAPI WebSocket server that receives raw PCM audio from the Chrome extension and returns live transcripts via the configured provider (OpenAI Whisper, Groq, or Deepgram).
+
+---
 
 ## Prerequisites
 
-- Docker + Docker Compose **or** Python 3.13 + [uv](https://docs.astral.sh/uv/)
-- PostgreSQL 15+ and Redis 7+ (included in the Docker Compose stack)
+- **Docker + Docker Compose** (recommended) — or Python 3.13 + [uv](https://docs.astral.sh/uv/)
+- PostgreSQL 15+ and Redis 7+ (both included in the Docker Compose stack)
 
-## Quick Start (Docker)
+---
+
+## Quick start (Docker)
 
 ```bash
-# 1. Copy the env file (no changes needed — API key is entered in the popup)
-cp .env.example .env
-
-# 2. Start Postgres, Redis, and the API server
+# from the repository root:
+cp backend/.env.example backend/.env
 docker-compose up --build
-
-# API running at http://localhost:8000
-# WebSocket: ws://localhost:8000/ws/transcribe
 ```
 
-## Running Without Docker
+- API health check: `http://localhost:8000/`
+- WebSocket endpoint: `ws://localhost:8000/ws/transcribe`
+
+---
+
+## Running without Docker
 
 ```bash
 cd backend
@@ -28,51 +32,59 @@ cd backend
 # Install dependencies
 uv sync          # or: pip install -e .
 
-# Start Postgres and Redis separately (e.g. via Docker or local installs), then:
+# Start Postgres and Redis separately, then:
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Environment Variables
+---
+
+## Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `postgresql://uc:uc@localhost:5432/universal_captions` | asyncpg-compatible Postgres URL |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `SESSION_TTL` | `14400` | Redis session TTL in seconds (default 4 hours) |
+| `SESSION_TTL` | `14400` | Redis session TTL in seconds (4 hours) |
 
-The OpenAI API key is supplied per-session from the extension popup and is never stored on the server.
+API keys are passed per-session from the extension popup and are never stored server-side.
 
-Copy `.env.example` to `.env` and set values before starting.
+Copy `.env.example` to `.env` before starting.
 
-## Connecting the Extension
+---
 
-1. Load the extension in Chrome (`chrome://extensions` → Load unpacked → select repo root).
-2. Click the Universal Captions toolbar icon.
-3. Paste your **OpenAI API key**.
-4. Backend URL defaults to `ws://localhost:8000` — change it under **Advanced** only if needed.
-5. Click **Start Captions** on any tab with audio.
-
-## WebSocket Protocol
+## WebSocket protocol
 
 ```
-Client → Server:
-  1. TEXT   {"type":"session_start","provider":"openai_chunked","api_key":"sk-...","model":"whisper-1","sample_rate":16000,"encoding":"pcm_f32le"}
-  2. BINARY <Float32-LE PCM frames>  (repeated)
+Client → Server
+  1. TEXT   {"type":"session_start","provider":"openai_chunked","api_key":"...","model":"whisper-1","sample_rate":16000,"encoding":"pcm_f32le","language":"en"}
+  2. BINARY <Float32-LE PCM frames>   (repeated until session ends)
   3. TEXT   {"type":"session_end"}
 
-Server → Client:
-  1. {"type":"transcript","text":"..."}   — complete phrase
-  2. {"type":"error","message":"..."}
+Server → Client
+  1. {"type":"session_started","session_id":"<uuid>"}
+  2. {"type":"transcript","text":"...","is_final":true}
+  3. {"type":"error","message":"..."}
+  4. {"type":"session_ended","session_id":"<uuid>"}
 ```
+
+`language` is optional — omit for auto-detect. The `session_started` message confirms the provider was initialised with a valid key before any audio is sent.
+
+---
 
 ## Providers
 
-| Value | Model | Description |
+| `provider` value | Model | Mechanism |
 |---|---|---|
-| `openai_chunked` | `whisper-1` | Buffers ~1s of Float32 PCM, converts to WAV in-memory, sends to `POST /v1/audio/transcriptions`. |
-| `local_whisper` | *(stub)* | Intended for faster-whisper on CPU/GPU. Not yet implemented. |
+| `openai_chunked` | `whisper-1` | Buffers 1.5 s of Float32 PCM → WAV in-memory → `POST /v1/audio/transcriptions` |
+| `groq` | `whisper-large-v3-turbo` | Same as `openai_chunked` with `base_url` overridden to Groq's endpoint |
+| `deepgram` | `nova-2` | Buffers 1.5 s of Float32 PCM → WAV → `POST https://api.deepgram.com/v1/listen` |
+| `local_whisper` | *(stub)* | Not implemented — raises `NotImplementedError` |
 
-## Running Tests
+API calls for each window are fired as background tasks so the next buffer starts filling immediately, keeping caption latency independent of API round-trip time.
+
+---
+
+## Running tests
 
 ```bash
 cd backend
