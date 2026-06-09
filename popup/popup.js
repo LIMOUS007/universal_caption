@@ -25,6 +25,30 @@ document.getElementById('toggle-key')?.addEventListener('click', () => {
   apiKeyEl.type = apiKeyEl.type === 'password' ? 'text' : 'password';
 });
 
+// Provider chip picker — each provider keeps its own key
+const apiKeyLabelEl = document.getElementById('api-key-label');
+const chips = document.querySelectorAll('.provider-chip');
+let _apiKeys = { openai_chunked: '', groq: '', deepgram: '' };
+let _activeProvider = 'openai_chunked';
+
+function selectProviderChip(provider, { skipKeyUpdate = false } = {}) {
+  chips.forEach(c => {
+    const active = c.dataset.provider === provider;
+    c.classList.toggle('active', active);
+    if (active) {
+      apiKeyLabelEl.textContent = c.dataset.label;
+      apiKeyEl.placeholder      = c.dataset.placeholder;
+    }
+  });
+  _activeProvider  = provider;
+  providerEl.value = provider;
+  if (!skipKeyUpdate) apiKeyEl.value = _apiKeys[provider] ?? '';
+  chrome.storage.local.set({ provider });
+}
+chips.forEach(chip => {
+  chip.addEventListener('click', () => selectProviderChip(chip.dataset.provider));
+});
+
 // Advanced section toggle
 document.getElementById('advanced-toggle')?.addEventListener('click', function () {
   const section = document.getElementById('advanced-section');
@@ -39,19 +63,21 @@ let _activeTabId = null;
 // Restore persisted config + state
 // ---------------------------------------------------------------------------
 chrome.storage.local.get(
-  ['capturing', 'wsStatus', 'wsError', 'provider', 'apiKey', 'groqApiKey', 'backendUrl',
-   'language', 'overlayConfig', 'captioningTabTitle', 'statusMessage'],
+  ['capturing', 'wsStatus', 'wsError', 'provider', 'apiKey', 'groqApiKey', 'apiKeys',
+   'backendUrl', 'language', 'overlayConfig', 'captioningTabTitle', 'statusMessage'],
   (data) => {
     console.log('[UC] popup: restored storage', data);
-    isCapturing      = !!data.capturing;
-    providerEl.value = data.provider || 'openai_chunked';
+    isCapturing = !!data.capturing;
 
-    const resolvedApiKey = data.apiKey || data.groqApiKey || '';
-    if (data.groqApiKey && !data.apiKey) {
-      chrome.storage.local.set({ apiKey: resolvedApiKey });
-      chrome.storage.local.remove('groqApiKey');
+    // Migrate legacy single-key storage into per-provider map
+    _apiKeys = { openai_chunked: '', groq: '', deepgram: '', ...(data.apiKeys || {}) };
+    if (!_apiKeys.openai_chunked && (data.apiKey || data.groqApiKey)) {
+      _apiKeys.openai_chunked = data.apiKey || data.groqApiKey;
+      chrome.storage.local.set({ apiKeys: _apiKeys });
+      chrome.storage.local.remove(['apiKey', 'groqApiKey']);
     }
-    apiKeyEl.value   = resolvedApiKey;
+
+    selectProviderChip(data.provider || 'openai_chunked');
     backendEl.value  = data.backendUrl || 'ws://localhost:8000';
     languageEl.value = data.language   || '';
     updateStatus(data.wsStatus || 'disconnected');
@@ -101,12 +127,11 @@ chrome.storage.local.get(
 // ---------------------------------------------------------------------------
 // Persist config fields on change
 // ---------------------------------------------------------------------------
-providerEl.addEventListener('change', () =>
-  chrome.storage.local.set({ provider: providerEl.value }),
-);
-apiKeyEl.addEventListener('input', () =>
-  chrome.storage.local.set({ apiKey: apiKeyEl.value }),
-);
+apiKeyEl.addEventListener('input', () => {
+  _apiKeys[_activeProvider] = apiKeyEl.value;
+  chrome.storage.local.set({ apiKeys: _apiKeys });
+  if (apiKeyEl.value.trim()) updateErrorNotice(null);
+});
 backendEl.addEventListener('input', () =>
   chrome.storage.local.set({ backendUrl: backendEl.value }),
 );
@@ -159,6 +184,15 @@ textOpacityEl.addEventListener('input', () => {
 // ---------------------------------------------------------------------------
 startBtn.addEventListener('click', async () => {
   console.log('[UC] popup: start clicked');
+
+  const key = apiKeyEl.value.trim();
+  if (!key) {
+    updateErrorNotice(`Enter a ${apiKeyLabelEl.textContent} to start captions.`);
+    return;
+  }
+  updateErrorNotice(null);
+  chrome.storage.local.set({ wsError: null });
+
   startBtn.disabled = true;
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -166,11 +200,16 @@ startBtn.addEventListener('click', async () => {
   _activeTabId = tab.id;
   console.log('[UC] popup: active tab', tab?.id, tab?.url);
 
+  const providerModels = {
+    openai_chunked: 'whisper-1',
+    groq:           'whisper-large-v3-turbo',
+    deepgram:       'nova-2',
+  };
   const config = {
-    provider:   providerEl.value,
-    apiKey:     apiKeyEl.value,
+    provider:   _activeProvider,
+    apiKey:     key,
     backendUrl: backendEl.value,
-    model:      'whisper-1',
+    model:      providerModels[_activeProvider] || 'whisper-1',
     language:   languageEl.value || undefined,
   };
 

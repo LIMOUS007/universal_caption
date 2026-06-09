@@ -88,6 +88,32 @@
     }
     #toggle-key:hover { color: #555; }
 
+    /* Provider chip picker */
+    #provider-chips {
+      display: flex;
+      gap: 4px;
+      margin-top: 5px;
+      flex-wrap: wrap;
+    }
+    .provider-chip {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      background: #f5f5f5;
+      color: #666;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: border-color 0.12s, background 0.12s, color 0.12s;
+    }
+    .provider-chip:hover { border-color: #1a73e8; color: #1a73e8; }
+    .provider-chip.active {
+      border-color: #1a73e8;
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+
     /* Lock config fields while capturing */
     .field.locked select,
     .field.locked input,
@@ -244,10 +270,15 @@
 
   <div id="body">
     <div class="field" id="field-api-key">
-      <label for="api-key">OpenAI API Key</label>
+      <label for="api-key" id="api-key-label">OpenAI API Key</label>
       <div class="input-row">
         <input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" />
         <button id="toggle-key" title="Show/hide key">👁</button>
+      </div>
+      <div id="provider-chips">
+        <button class="provider-chip active" data-provider="openai_chunked" data-label="OpenAI API Key" data-placeholder="sk-…">OpenAI</button>
+        <button class="provider-chip" data-provider="groq" data-label="Groq API Key" data-placeholder="gsk_…">Groq</button>
+<button class="provider-chip" data-provider="deepgram" data-label="Deepgram API Key" data-placeholder="…">Deepgram</button>
       </div>
     </div>
 

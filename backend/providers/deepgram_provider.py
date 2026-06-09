@@ -1,12 +1,8 @@
 """
-OpenAI Chunked Whisper provider.
+Deepgram Nova transcription provider.
 
-Accumulates Float32 PCM until a configurable window is full, encodes it to
-WAV in-process (no tmp files, no external libraries), and calls the OpenAI
-audio.transcriptions endpoint (whisper-1 or compatible model).
-
-API calls are fired as background tasks so the next window starts filling
-immediately — API latency no longer adds to the effective caption interval.
+Accumulates Float32 PCM, encodes to WAV, and POSTs to Deepgram's
+/v1/listen endpoint (raw binary body — no multipart).
 """
 
 import asyncio
@@ -15,32 +11,29 @@ import struct
 import wave
 from collections.abc import AsyncIterator
 
-from openai import AsyncOpenAI
+import httpx
 
 from events import TranscriptionProvider, TranscriptEvent
 
-# 1.5 s × 16 000 samples/s × 4 bytes/sample
 _DEFAULT_WINDOW_BYTES = int(1.5 * 16_000 * 4)
 
 
-class OpenAIChunkedTranscriber(TranscriptionProvider):
+class DeepgramTranscriber(TranscriptionProvider):
     def __init__(self, config: dict) -> None:
-        self._client = AsyncOpenAI(
-            api_key=config["api_key"],
-            base_url=config.get("base_url"),
-        )
-        self._model: str = config.get("model", "whisper-1")
-        self._sample_rate: int = config.get("sample_rate", 16_000)
-        self._language: str | None = config.get("language")
-        self._window_bytes: int = config.get("window_bytes", _DEFAULT_WINDOW_BYTES)
-        self._buffer = bytearray()
+        self._api_key      = config["api_key"]
+        self._model        = config.get("model", "nova-2")
+        self._sample_rate  = config.get("sample_rate", 16_000)
+        self._language     = config.get("language")
+        self._window_bytes = config.get("window_bytes", _DEFAULT_WINDOW_BYTES)
+        self._buffer       = bytearray()
         self._queue: asyncio.Queue[TranscriptEvent | None] = asyncio.Queue()
         self._pending: set[asyncio.Task] = set()
-        self._stopped = False
-        self._error_sent = False
+        self._stopped      = False
+        self._error_sent   = False
+        self._http         = httpx.AsyncClient(timeout=30.0)
 
     async def start(self) -> None:
-        self._stopped = False
+        self._stopped    = False
         self._error_sent = False
         self._buffer.clear()
 
@@ -56,11 +49,21 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
     async def _call_api(self, payload: bytes) -> None:
         wav = _f32le_to_wav(payload, self._sample_rate)
         try:
-            kwargs: dict = {"model": self._model, "file": ("audio.wav", wav, "audio/wav")}
+            params: dict = {"model": self._model, "punctuate": "true", "smart_format": "true"}
             if self._language:
-                kwargs["language"] = self._language
-            result = await self._client.audio.transcriptions.create(**kwargs)
-            text = result.text.strip()
+                params["language"] = self._language
+            resp = await self._http.post(
+                "https://api.deepgram.com/v1/listen",
+                headers={
+                    "Authorization": f"Token {self._api_key}",
+                    "Content-Type": "audio/wav",
+                },
+                params=params,
+                content=wav,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["results"]["channels"][0]["alternatives"][0]["transcript"].strip()
             if text:
                 await self._queue.put(TranscriptEvent(
                     event_type="transcript",
@@ -68,7 +71,7 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
                     is_final=True,
                 ))
         except Exception as exc:
-            print(f"[openai_chunked] Whisper API error: {exc}")
+            print(f"[deepgram] API error: {exc}")
             if not self._error_sent:
                 self._error_sent = True
                 await self._queue.put(TranscriptEvent(
@@ -95,14 +98,10 @@ class OpenAIChunkedTranscriber(TranscriptionProvider):
         if self._pending:
             await asyncio.gather(*self._pending, return_exceptions=True)
         await self._queue.put(None)
+        await self._http.aclose()
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _f32le_to_wav(pcm_f32: bytes, sample_rate: int) -> bytes:
-    """Convert raw Float32-LE PCM to a WAV byte string (Int16, mono)."""
     n = len(pcm_f32) // 4
     floats = struct.unpack_from(f"<{n}f", pcm_f32)
     pcm16 = struct.pack(
@@ -112,7 +111,7 @@ def _f32le_to_wav(pcm_f32: bytes, sample_rate: int) -> bytes:
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
         wf.setnchannels(1)
-        wf.setsampwidth(2)        # 16-bit
+        wf.setsampwidth(2)
         wf.setframerate(sample_rate)
         wf.writeframes(pcm16)
     return buf.getvalue()

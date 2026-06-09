@@ -10,6 +10,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "redis[asyncio]>=5.2.0",
     "openai>=1.57.0",
+    "httpx>=0.28",
     "pydantic-settings>=2.7.0",
 ]
 

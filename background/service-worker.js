@@ -90,15 +90,17 @@ async function handleStart(tabId, config) {
   _ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.type === 'transcript_delta' || data.type === 'transcript') {
+      if (data.type === 'session_started') {
+        chrome.storage.local.set({ wsError: null });
+      } else if (data.type === 'transcript_delta' || data.type === 'transcript') {
         if (data.text) {
           const t4 = Date.now();
           console.log(`[UC LAT] T4 transcript_received t=${t4} text="${data.text.slice(0, 40)}"`);
           deliverCaptionToTab(data.text);
         }
       } else if (data.type === 'error') {
-        console.error('[UC] Backend returned error:', data.message);
-        chrome.storage.local.set({ wsStatus: 'error', wsError: data.message || 'Unknown error' });
+        console.error('[UC] Backend returned error:', data.message || data.text);
+        chrome.storage.local.set({ wsStatus: 'error', wsError: data.message || data.text || 'Unknown error' });
       }
     } catch (e) {
       console.error('[UC] Failed to parse WS message:', e);
@@ -260,19 +262,27 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== 'toggle-captions') return;
   const data = await chrome.storage.local.get(
-    ['capturing', 'apiKey', 'backendUrl', 'provider', 'language']
+    ['capturing', 'apiKeys', 'backendUrl', 'provider', 'language']
   );
   if (data.capturing) {
     await handleStop().catch(console.error);
   } else {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
+    const provider = data.provider || 'openai_chunked';
+    const apiKeys  = data.apiKeys  || {};
+    if (!apiKeys[provider]) return; // no key configured — skip silently
+    const providerModels = {
+      openai_chunked: 'whisper-1',
+      groq:           'whisper-large-v3-turbo',
+      deepgram:       'nova-2',
+    };
     await handleStart(tab.id, {
-      provider:   data.provider   || 'openai_chunked',
-      apiKey:     data.apiKey     || '',
-      backendUrl: data.backendUrl || 'ws://localhost:8000',
-      model:      'whisper-1',
-      language:   data.language   || undefined,
+      provider,
+      apiKey:     apiKeys[provider] || '',
+      backendUrl: data.backendUrl   || 'ws://localhost:8000',
+      model:      providerModels[provider] || 'whisper-1',
+      language:   data.language    || undefined,
     }).catch(console.error);
   }
 });
