@@ -6,7 +6,7 @@ Live subtitles on any Chrome tab — YouTube, Zoom, podcasts, lectures, anything
 
 ## Before you start — what you'll need
 
-You need **3 things** before following the steps below:
+You need **2 things** before following the steps below:
 
 ### 1. Google Chrome
 Most people already have this. If not, [download it here](https://www.google.com/chrome/).
@@ -19,17 +19,28 @@ This is a free app that runs the caption server in the background. Think of it l
 
 > After installing, always **open Docker Desktop first** before using the extension. It needs to be running in the background.
 
-### 3. A free API key (pick one)
+### 3. A transcription provider (pick one)
 
-An API key is like a password that gives the app permission to use a transcription service. Pick whichever is easiest:
+| Provider | Cost | API Key needed? | Notes |
+|---|---|---|---|
+| **Groq** | Free | Yes | Fastest cloud option — great for beginners |
+| **Deepgram** | Free $200 credit | Yes | High accuracy, low latency |
+| **OpenAI** | Pay per use | Yes | Whisper-1 model via OpenAI API |
+| **Local Whisper** | Free forever | **No** | Runs on your computer — no internet needed for transcription |
 
-| Service | Cost | How to get the key |
-|---|---|---|
-| **Groq** (recommended for beginners) | Free | Go to [console.groq.com/keys](https://console.groq.com/keys) → sign up → click "Create API Key" → copy it |
-| **Deepgram** | Free $200 credit | Go to [console.deepgram.com](https://console.deepgram.com) → sign up → go to API Keys → create one |
-| **OpenAI** | Pay per use | Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → sign up → create a key |
+**Not sure which to pick?**
+- Want the easiest start → **Groq** (free, no setup beyond the key)
+- Want no API key and total privacy → **Local Whisper** (first use downloads ~250 MB, then it's instant)
 
-**Groq is free and fast — start there if you're unsure.**
+#### How to get a cloud API key
+
+| Service | Steps |
+|---|---|
+| **Groq** | Go to [console.groq.com/keys](https://console.groq.com/keys) → sign up → click "Create API Key" → copy it |
+| **Deepgram** | Go to [console.deepgram.com](https://console.deepgram.com) → sign up → go to API Keys → create one |
+| **OpenAI** | Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → sign up → create a key |
+
+> **Local Whisper** — no key required. Skip straight to setup.
 
 ---
 
@@ -100,12 +111,19 @@ When you see a line that says `Uvicorn running on http://0.0.0.0:8000` — you'r
 
 ---
 
-### Step 5 — Add your API key
+### Step 5 — Configure your provider
 
-1. Click the Universal Captions icon in the toolbar
-2. Click the chip for the service you signed up for — **OpenAI**, **Groq**, or **Deepgram**
-3. Paste your API key into the box
-4. Leave everything else as-is
+Click the Universal Captions icon in the toolbar, then pick your provider chip:
+
+**Cloud providers (OpenAI / Groq / Deepgram):**
+1. Click the chip for the service you signed up for
+2. Paste your API key into the box
+3. Leave everything else as-is
+
+**Local Whisper:**
+1. Click the **Local** chip
+2. The API key field disappears — no key needed
+3. That's it. The first time you start captions, the backend will download the Whisper model (~250 MB). This takes about 1–2 minutes on a normal connection. After that first download it's instant every time.
 
 ---
 
@@ -132,19 +150,38 @@ Once captions are on, a box appears on the page. Here's what you can do with it:
 
 ---
 
+## Choosing a provider — quick comparison
+
+| | Groq | Deepgram | OpenAI | Local Whisper |
+|---|---|---|---|---|
+| API key required | Yes | Yes | Yes | **No** |
+| Works offline | No | No | No | **Yes** |
+| Latency | ~0.5 s | ~0.5 s | ~1–2 s | ~0.5–2 s (CPU) |
+| Accuracy | Very high | Very high | High | High (`small` model) |
+| Cost | Free | Free credit | Per minute | Free |
+| Privacy | Cloud | Cloud | Cloud | **Fully local** |
+
+---
+
 ## Something not working?
 
 **The status dot stays red or shows "Connection error"**
 → Docker Desktop is probably not running. Open it and make sure the engine is started, then run `docker-compose up` again in the terminal.
 
 **"Enter a key to start captions"**
-→ You need to paste your API key first (Step 5 above).
+→ You need to paste your API key first (Step 5 above). If you're using Local Whisper, make sure the **Local** chip is selected — it hides the key field automatically.
 
 **Status is green but no captions appear**
 → Check that the tab's audio isn't muted. Try stopping and starting captions again.
 
 **"401" or "invalid key" error**
 → The API key was rejected. Double-check you copied the full key without any extra spaces, and that you're using the right provider chip for that key.
+
+**Local Whisper — no captions for the first 1–2 minutes**
+→ The model is downloading on first use (~250 MB). Watch the Docker terminal window — you'll see download progress. Once it finishes, captions start flowing. It only downloads once.
+
+**Local Whisper — captions are inaccurate or missing words**
+→ The `small` model (default) works well for clear speech. Background noise or multiple speakers will reduce accuracy. Try speaking clearly or reducing background audio.
 
 **`docker-compose` command not found**
 → Docker Desktop may not have finished installing. Restart your terminal (close it and open a new one) and try again.
@@ -153,10 +190,49 @@ Once captions are on, a box appears on the page. Here's what you can do with it:
 → Make sure you selected the right folder — it should be the one that has `manifest.json` directly inside it, not a subfolder.
 
 **Alt+Shift+C does nothing**
-→ Make sure you've entered an API key first. The shortcut won't work if no key is configured.
+→ Make sure captions are configured (API key entered, or Local chip selected) and the backend is running.
 
 ---
 
 ## How it works (optional reading)
 
-The extension captures audio from the tab using Chrome's built-in audio tools. It converts the audio into small chunks and sends them over a local connection to the backend server running on your computer. The server sends those chunks to the transcription service (Groq, Deepgram, or OpenAI), gets back the text, and displays it on the page. Your API key is only used on your own machine — it's never stored on any external server.
+The extension captures audio from the tab using Chrome's built-in audio tools. It converts the audio into small 1.5-second chunks and sends them over a local connection to the backend server running on your computer.
+
+**Cloud providers (Groq / Deepgram / OpenAI):** the backend sends each chunk to the cloud transcription API, gets back the text, and displays it on the page. Your API key is sent per-session from the popup — it is never stored on any server.
+
+**Local Whisper:** the backend runs the [faster-whisper](https://github.com/SYSTRAN/faster-whisper) model directly on your CPU. No audio ever leaves your machine. The model (`whisper-small`, ~250 MB) is downloaded from HuggingFace on first use and cached permanently in Docker. After the first download, it loads in a few seconds each time.
+
+---
+
+## Providers at a glance (for developers)
+
+| ID | Backend | Model | Notes |
+|---|---|---|---|
+| `openai_chunked` | OpenAI API | `whisper-1` | Default cloud provider |
+| `groq` | Groq API | `whisper-large-v3-turbo` | Fastest cloud option |
+| `deepgram` | Deepgram API | `nova-2` | Best punctuation/formatting |
+| `local_whisper` | faster-whisper (CPU) | `whisper-small` | Fully local, no key required |
+
+### Running the backend without Docker
+
+```bash
+cd backend
+pip install uv
+uv sync
+uvicorn main:app --reload
+```
+
+Requires Postgres and Redis running locally. Set `DATABASE_URL` and `REDIS_URL` in `backend/.env`.
+
+### Project layout
+
+```
+background/service-worker.js    WebSocket client, session control, chrome.alarms keepalive
+content/caption-overlay.js      Shadow DOM overlay injected into pages; drag/resize/pin/close
+offscreen/audio-processor.js    AudioWorklet: 16kHz PCM Float32, 16k-sample chunks
+offscreen/offscreen-main.js     tabCapture → AudioContext setup, forwards chunks to SW
+popup/popup.html + popup.js     Extension popup: provider chips, config, start/stop, status
+backend/                        FastAPI + WebSocket transcription server
+backend/providers/              One file per provider: openai_chunked, groq, deepgram, local_whisper
+backend/db/                     Postgres session/segment/usage schema + asyncpg queries
+```

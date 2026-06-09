@@ -52,15 +52,17 @@ class LocalWhisperTranscriber(TranscriptionProvider):
         audio = _f32le_to_numpy(payload)
         loop = asyncio.get_running_loop()
         try:
-            segments, _ = await loop.run_in_executor(
-                None,
-                lambda: self._model.transcribe(
+            # Consume the generator inside the executor — faster-whisper returns a
+            # lazy iterator and the actual inference happens during iteration.
+            def _run() -> str:
+                segs, _ = self._model.transcribe(
                     audio,
                     language=self._language,
                     beam_size=5,
-                ),
-            )
-            text = " ".join(s.text for s in segments).strip()
+                )
+                return " ".join(s.text for s in segs).strip()
+
+            text = await loop.run_in_executor(None, _run)
             if text:
                 await self._queue.put(TranscriptEvent(
                     event_type="transcript",
