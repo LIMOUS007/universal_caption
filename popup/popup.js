@@ -18,7 +18,7 @@ const textOpacityEl    = document.getElementById('text-opacity');
 const textOpacityValEl = document.getElementById('text-opacity-val');
 const languageEl       = document.getElementById('language');
 
-const lockableFields = ['field-api-key', 'field-backend-url', 'field-language'];
+const lockableFields   = ['api-key-inputs', 'field-backend-url', 'field-language'];
 
 // API key show/hide
 document.getElementById('toggle-key')?.addEventListener('click', () => {
@@ -28,21 +28,25 @@ document.getElementById('toggle-key')?.addEventListener('click', () => {
 // Provider chip picker — each provider keeps its own key
 const apiKeyLabelEl = document.getElementById('api-key-label');
 const chips = document.querySelectorAll('.provider-chip');
-let _apiKeys = { openai_chunked: '', groq: '', deepgram: '' };
+let _apiKeys = { openai_chunked: '', groq: '', deepgram: '', local_whisper: '' };
 let _activeProvider = 'openai_chunked';
 
 function selectProviderChip(provider, { skipKeyUpdate = false } = {}) {
+  const isLocal = provider === 'local_whisper';
   chips.forEach(c => {
     const active = c.dataset.provider === provider;
     c.classList.toggle('active', active);
-    if (active) {
+    if (active && !isLocal) {
       apiKeyLabelEl.textContent = c.dataset.label;
       apiKeyEl.placeholder      = c.dataset.placeholder;
     }
   });
   _activeProvider  = provider;
   providerEl.value = provider;
-  if (!skipKeyUpdate) apiKeyEl.value = _apiKeys[provider] ?? '';
+
+  document.getElementById('api-key-inputs').style.display = isLocal ? 'none' : '';
+
+  if (!skipKeyUpdate && !isLocal) apiKeyEl.value = _apiKeys[provider] ?? '';
   chrome.storage.local.set({ provider });
 }
 chips.forEach(chip => {
@@ -70,7 +74,7 @@ chrome.storage.local.get(
     isCapturing = !!data.capturing;
 
     // Migrate legacy single-key storage into per-provider map
-    _apiKeys = { openai_chunked: '', groq: '', deepgram: '', ...(data.apiKeys || {}) };
+    _apiKeys = { openai_chunked: '', groq: '', deepgram: '', local_whisper: '', ...(data.apiKeys || {}) };
     if (!_apiKeys.openai_chunked && (data.apiKey || data.groqApiKey)) {
       _apiKeys.openai_chunked = data.apiKey || data.groqApiKey;
       chrome.storage.local.set({ apiKeys: _apiKeys });
@@ -185,8 +189,9 @@ textOpacityEl.addEventListener('input', () => {
 startBtn.addEventListener('click', async () => {
   console.log('[UC] popup: start clicked');
 
-  const key = apiKeyEl.value.trim();
-  if (!key) {
+  const isLocal = _activeProvider === 'local_whisper';
+  const key = isLocal ? '' : apiKeyEl.value.trim();
+  if (!isLocal && !key) {
     updateErrorNotice(`Enter a ${apiKeyLabelEl.textContent} to start captions.`);
     return;
   }
@@ -204,6 +209,7 @@ startBtn.addEventListener('click', async () => {
     openai_chunked: 'whisper-1',
     groq:           'whisper-large-v3-turbo',
     deepgram:       'nova-2',
+    local_whisper:  '',
   };
   const config = {
     provider:   _activeProvider,

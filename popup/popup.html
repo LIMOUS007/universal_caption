@@ -270,15 +270,18 @@
 
   <div id="body">
     <div class="field" id="field-api-key">
-      <label for="api-key" id="api-key-label">OpenAI API Key</label>
-      <div class="input-row">
-        <input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" />
-        <button id="toggle-key" title="Show/hide key">👁</button>
+      <div id="api-key-inputs">
+        <label for="api-key" id="api-key-label">OpenAI API Key</label>
+        <div class="input-row">
+          <input type="password" id="api-key" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+          <button id="toggle-key" title="Show/hide key">👁</button>
+        </div>
       </div>
       <div id="provider-chips">
         <button class="provider-chip active" data-provider="openai_chunked" data-label="OpenAI API Key" data-placeholder="sk-…">OpenAI</button>
         <button class="provider-chip" data-provider="groq" data-label="Groq API Key" data-placeholder="gsk_…">Groq</button>
-<button class="provider-chip" data-provider="deepgram" data-label="Deepgram API Key" data-placeholder="…">Deepgram</button>
+        <button class="provider-chip" data-provider="deepgram" data-label="Deepgram API Key" data-placeholder="…">Deepgram</button>
+        <button class="provider-chip" data-provider="local_whisper" data-label="" data-placeholder="">Local</button>
       </div>
     </div>
 

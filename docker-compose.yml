@@ -48,8 +48,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://uc:uc@postgres:5432/universal_captions
-      REDIS_URL:    redis://redis:6379
+      DATABASE_URL:                 postgresql://uc:uc@postgres:5432/universal_captions
+      REDIS_URL:                    redis://redis:6379
+      HF_HUB_DISABLE_SSL_VERIFICATION: "1"
+      HUGGINGFACE_HUB_CACHE:        /root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,8 +61,10 @@ services:
     # Remove the volumes block for a production build.
     volumes:
       - ./backend:/app
+      - hf_cache:/root/.cache/huggingface
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   pgdata:
   redisdata:
+  hf_cache:

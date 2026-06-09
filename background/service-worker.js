@@ -83,7 +83,10 @@ async function handleStart(tabId, config) {
       sample_rate: 16000,
       encoding:    'pcm_f32le',
     };
-    if (config.language) sessionMsg.language = config.language;
+    if (config.language)   sessionMsg.language     = config.language;
+    if (config.modelSize)  sessionMsg.model_size   = config.modelSize;
+    if (config.device)     sessionMsg.device       = config.device;
+    if (config.computeType) sessionMsg.compute_type = config.computeType;
     _ws.send(JSON.stringify(sessionMsg));
   };
 
