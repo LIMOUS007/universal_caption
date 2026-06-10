@@ -89,7 +89,7 @@ async function initAudio(streamId) {
     console.log(`[UC LAT] T1 chunk_ready samples=${float32Array.length} t=${t1}`);
 
     const rms = getRMS(float32Array);
-    if (rms < 0.01) {
+    if (rms < 0.0001) {
       console.debug('[UC] Skipping silent chunk, RMS:', rms);
       return;
     }
